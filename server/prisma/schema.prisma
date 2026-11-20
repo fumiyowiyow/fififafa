@@ -1,0 +1,2591 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                      String                 @id @default(cuid())
+  nama                    String
+  email                   String                 @unique
+  passwordHash            String
+  fotoUrl                 String?
+  telegramId              String?                @unique
+  telegramUsername        String?
+  // Tautan Telegram aman (14 Okt 2026): kode SEKALI PAKAI dibuat pemilik akun dari halaman Profil
+  // (sudah login web), lalu `/daftar KODE` di bot. Yang disimpan hanya HASH-nya + kedaluwarsa.
+  telegramKodeHash        String?
+  telegramKodeKadaluarsa  DateTime?
+  refreshTokenVersion     Int                    @default(0)
+  nomorWa                 String?
+  tanggalLahir            DateTime?
+  tanggalMasuk            DateTime               @default(now())
+  jenisKelamin            String? // L / P
+  posisi                  String? // 3D Artist, Admin, Rigger, dll
+  alamat                  String?
+  namaBank                String?
+  noRekening              String?
+  atasNamaRekening        String?
+  nik                     String?
+  nomorBpjs               String?
+  statusAktif             Boolean                @default(true)
+  isLiveIn                Boolean                @default(false)
+  isAnggotaKoperasi       Boolean                @default(false)
+  statusKeanggotaan       StatusKeanggotaan?
+  // Data program siswa (Vokasi/KBU) -- cuma terbaca lewat getById (diri sendiri/pengelola
+  // anggota itu), TIDAK ikut daftar umum getAll karena menyangkut anak di bawah umur.
+  kelas                   String?
+  sekolah                 String?
+  tinggalDengan           String? // Orang Tua / Ekosistem / MANA / JOGLO / dst
+  rekamJejak              String?                @db.Text
+  // Raport siswa (13 Okt 2026): mentor penulis raport -- ditunjuk per siswa, bisa lebih dari satu
+  // (tabel MentorSiswa), fokus kompetensi (mis. Rigging / Animasi Emote / 3D Modeling), tgl mulai program.
+  fokusKompetensi         String?
+  tempatLahir             String?
+  tanggalMulaiProgram     DateTime?
+  mentorSaya              MentorSiswa[]          @relation("MentorSiswaSiswa")
+  siswaBimbingan          MentorSiswa[]          @relation("MentorSiswaMentor")
+  raportSiswa             RaportSiswa[]          @relation("RaportSiswa")
+  raportDitulis           RaportSiswa[]          @relation("RaportPenulis")
+  roles                   UserRole[]
+  jurnalSebagaiTalent     JurnalTalent[]         @relation("JurnalUser")
+  jurnalSebagaiPenulis    JurnalTalent[]         @relation("JurnalPenulis")
+  penilaianSebagaiKader   PenilaianKader[]       @relation("PenilaianUser")
+  penilaianSebagaiPenilai PenilaianKader[]       @relation("PenilaianPenilai")
+  danaPengembanganUnits   DanaPengembanganUnit[] @relation("DanaPengembanganUnitPengelola")
+  studioPemilik           StudioPemilik[] // kepemilikan studio — bisa multi-studio, termasuk yang bukan tempat kerja. SHU dihitung on-the-fly dari studio.totalShu * persenSaham
+  assignmentProduksi      AssignmentProduksi[] // Modul Produksi (7 Agustus 2026) -- order yang di-assign ke user ini
+  catatanLembur           CatatanLembur[] // Modul Payroll (Fase 3, 7 Agustus 2026)
+  penggajian              Penggajian[] // Modul Payroll (Fase 3, 7 Agustus 2026)
+  produksiAdminMarket     ProduksiAdminMarket[] // akses kelola order per studio TANPA butuh role KOORDINATOR (7 Agustus 2026)
+  produksiSuperOverride   ProduksiSuperOverride? // override akses Superadmin KHUSUS modul Produksi/Payroll (8 Agustus 2026)
+  leadsSebagaiMarketer    MarketingLead[] // Fase 2 (Marketing, 8 Agustus 2026) -- lead yang dipegang user ini
+  ordersSebagaiMarketer   OrderProduksi[] // order yang closing-nya atribusi ke user ini (beda dari assignmentProduksi = talent pengerjaan)
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+  fungsiKerja         FungsiAnggota[]
+  penugasanAkunMarketer PenugasanAkunMarketer[]
+  aktivitasMarketer     AktivitasMarketer[]
+  targetMarketing       TargetMarketing[]
+  profilSosial          ProfilSosialMarketer[]
+  logHarianMarketer     LogHarianMarketer[]
+}
+
+model UserRole {
+  id           String      @id @default(cuid())
+  userId       String
+  roleType     RoleType
+  circleId     String?
+  rumahUsahaId String?
+  studioId     String?
+  takeHomePay  Float? // THP spesifik (user,studio) — cuma relevan kalau studioId terisi
+  user         User        @relation(fields: [userId], references: [id])
+  circle       Circle?     @relation(fields: [circleId], references: [id])
+  rumahUsaha   RumahUsaha? @relation(fields: [rumahUsahaId], references: [id])
+  studio       Studio?     @relation(fields: [studioId], references: [id])
+}
+
+// Label kategori keanggotaan (BUKAN hak akses -- itu tetap RoleType). null = belum diset, tampil
+// pakai tier turunan dari role seperti sebelumnya. Ditambah 10 Okt 2026 karena tier lama
+// (Pengurus Inti/Staf/Magang) gak cukup bedain Karyawan vs Mentor vs siswa program Vokasi/KBU.
+enum StatusKeanggotaan {
+  KARYAWAN
+  MENTOR
+  MAGANG
+  SISWA_VOKASI
+  SISWA_KBU
+}
+
+enum StatusRaport {
+  DRAFT
+  TERBIT
+}
+
+enum RoleType {
+  ADVISOR
+  KEPALA_EKOSISTEM
+  KEPALA_CIRCLE
+  KEPALA_RUMAH_USAHA
+  ADMIN_FUNGSIONAL
+  PENDAMPING
+  KOORDINATOR
+  KADER
+  KARYAWAN
+  MAGANG
+  PENGELOLA_DANA
+  DIGNITY // bukan jenjang organisasi -- muncul dari "sejarah jasa" di studio, gak nentuin senioritas
+  PENASIHAT // posisi STUDIO ("Advisor" studio) -- BEDA dari ADVISOR (admin ecosystem-wide,
+  // ditampilkan "Super Admin" di UI). PENASIHAT murni role studio biasa, gak ada bypass
+  // akses admin apa pun.
+}
+
+model Circle {
+  id             String          @id @default(cuid())
+  nama           String
+  kepalId        String
+  colorHex       String
+  deskripsi      String?
+  alamat         String?
+  mapsUrl        String?
+  studios        Studio[]
+  userRoles      UserRole[]
+  orgFundReports OrgFundReport[]
+  createdAt      DateTime        @default(now())
+  slug                String?  @unique // alamat web circle (bloom → bloom.domain-anda.com); null = belum punya web
+}
+
+model Studio {
+  id                  String                   @id @default(cuid())
+  biayaStudio         BiayaStudio[]
+  penarikanPendapatan PenarikanPendapatan[]
+  nama                String
+  circleId            String?
+  rumahUsahaId        String?
+  // Unit di bawah Korporasi (8 Nov 2026): indukId = id unit KORPORASI, circleId & rumahUsahaId null.
+  // Koordinatornya tetap melapor seperti biasa; angkanya dijumlah ke Korporasi (bukan ke circle).
+  indukId             String?
+  tipe                StudioTipe
+  niche               String?
+  market              String?
+  koordinatorId       String?
+  tanggalBerdiri      DateTime?
+  statusAktif         Boolean                  @default(true)
+  // Studio kolaborasi (13 Okt 2026): studio yang angkanya dihitung di circle MITRA (mis. Souldear
+  // = Auralist). hitungDiEkosistem=false -> TIDAK ikut total omset/kas/pengeluaran/anggota
+  // ekosistem & Monthly Report, tapi tetap aktif & terpantau (laporan mingguan, market, tim).
+  hitungDiEkosistem   Boolean                  @default(true)
+  mitraKolaborasi     String?
+  skbUrl              String?
+  // SHU studio ini SATU angka tetap ("fix ditentukan", bukan riwayat/dihitung dari kas) — jumlah
+  // tiap pemilik = totalShu * persenSaham/100, dihitung on-the-fly, TIDAK disimpan per-pemilik.
+  statusShu           Boolean                  @default(false)
+  totalShu            Float                    @default(0)
+  circle              Circle?                  @relation(fields: [circleId], references: [id])
+  rumahUsaha          RumahUsaha?              @relation(fields: [rumahUsahaId], references: [id])
+  induk               Studio?                  @relation("IndukUnit", fields: [indukId], references: [id])
+  anakUnit            Studio[]                 @relation("IndukUnit")
+  weeklyReports       WeeklyReport[]
+  userRoles           UserRole[]
+  rekening            StudioRekening[]
+  monthlyNotes        StudioMonthlyNote[]
+  cpmSnapshots        StudioCpmBulanan[]
+  kanbanColumns       KanbanColumn[]
+  pemilik             StudioPemilik[]
+  pengeluaranRutin    StudioPengeluaranRutin[]
+  pengeluaranItems    Pengeluaran[]
+  // Modul Produksi (7 Agustus 2026) -- dua relasi TERPISAH ke OrderProduksi: akunProduksi/
+  // orderProduksi buat order YANG DIKERJAKAN studio ini, orderSebagaiKlien buat order INTERNAL
+  // di mana studio ini jadi KLIEN-nya studio lain (lihat OrderProduksi.klienStudio).
+  akunProduksi        AkunProduksi[]
+  orderProduksi       OrderProduksi[]
+  orderSebagaiKlien   OrderProduksi[]          @relation("KlienInternal")
+  produksiAdminMarket ProduksiAdminMarket[]
+  klienProduksi       KlienProduksi[]
+  // Modul Payroll (Fase 3, 7 Agustus 2026)
+  rateCardLembur      RateCardLembur[]
+  penggajian          Penggajian[]
+  tunjanganTemplate   TunjanganTemplate[]
+  rencanaKas          RencanaKas[]
+  // Fase 2 (Marketing, 8 Agustus 2026)
+  marketingLeads      MarketingLead[]
+  createdAt           DateTime                 @default(now())
+  tahapProduksi       TahapProduksi[]
+  fungsiAnggota       FungsiAnggota[]
+  aktivitasMarketer   AktivitasMarketer[]
+}
+
+// CPM ("Cost Per Month") studio TIDAK LAGI satu angka manual (cpmTarget, dihapus 26 Juli 2026) —
+// sekarang dihitung otomatis = SUM(takeHomePay semua anggota studio) + SUM(jumlah di sini)
+// + SUM(SHU per pemilik = totalShu * persenSaham/100). Kategori dibatasi 3 (SUBSCRIPTION/SUPPORT/
+// LAINNYA), item di dalamnya bebas ditambah/diedit/dihapus per studio -- lihat utils/cpm.js.
+// ── Aset laporan PDF (13 Okt 2026, diadaptasi dari playgroundecos.app) ──────────────────────
+// Logo & foto sampul disimpan sebagai data URL (ikut backup harian DB) di tabel TERPISAH, BUKAN
+// kolom di Circle/RumahUsaha/Studio: data URL bisa ±300-900 KB, dan banyak query ambil baris
+// circle/studio utuh (include tanpa select) -- kolom di sana bakal ikut kebawa ke setiap respons.
+// jenis = circle | rumah-usaha | unit (| ekosistem utk foto sampul), targetId = id sasaran
+// ('' untuk ekosistem). Tanpa FK karena sasarannya lintas tabel.
+
+// Logo circle / rumah usaha / unit untuk laporan -- kosong = logo otomatis (inisial + warna).
+model LogoLaporan {
+  id           String   @id @default(cuid())
+  jenis        String
+  targetId     String
+  /// data URL PNG/JPEG ≤ ±400 rb karakter (PNG dipertahankan supaya transparan)
+  dataUrl      String
+  diunggahOleh String?
+  updatedAt    DateTime @updatedAt
+
+  @@unique([jenis, targetId])
+}
+
+// Galeri foto sampul laporan per sasaran (maks 12) -- bisa dipakai lagi tanpa unggah ulang.
+model FotoSampul {
+  id           String   @id @default(cuid())
+  jenis        String
+  targetId     String
+  nama         String?
+  /// data URL JPEG/PNG ≤ ±900 rb karakter, dikecilkan di peramban
+  dataUrl      String
+  /// data URL kecil untuk galeri pilihan
+  thumb        String?
+  diunggahOleh String?
+  createdAt    DateTime @default(now())
+
+  @@index([jenis, targetId, createdAt])
+}
+
+// Pengeluaran AKTUAL per item (13 Okt 2026) -- beda dari StudioPengeluaranRutin (template biaya
+// bulanan buat hitung CPM). WeeklyReport.pengeluaran = total item yang tanggalnya jatuh di periode
+// laporan itu, dihitung ulang server tiap item berubah (utils/pengeluaran.js) -- gak diketik lagi.
+// tanggal = tanggal kalender WIB disimpan sebagai UTC tengah malam, sama kayak periodeAwal laporan.
+model Pengeluaran {
+  id          String   @id @default(cuid())
+  studioId    String
+  studio      Studio   @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  tanggal     DateTime
+  kategori    String // BIAYA_GAJI | BIAYA_USAHA | BIAYA_ADM_BANK | BIAYA_RUMAH_TANGGA | BIAYA_PULSA | BIAYA_PERLENGKAPAN | BIAYA_ENTERTAINMENT | BIAYA_OPERASIONAL | LAIN_LAIN | SHU | THR | INFAQ | DATA_LAMA (+ lama: BEBAN_ORANG | OPERASIONAL | SUBSCRIPTION | SUPPORT | LAINNYA)
+  nama        String
+  jumlah      Float
+  dicatatOleh String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([studioId, tanggal])
+}
+
+model StudioPengeluaranRutin {
+  id        String                   @id @default(cuid())
+  studioId  String
+  kategori  PengeluaranRutinKategori
+  nama      String
+  jumlah    Float                    @default(0)
+  studio    Studio                   @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  createdAt DateTime                 @default(now())
+  updatedAt DateTime                 @updatedAt
+}
+
+enum PengeluaranRutinKategori {
+  SUBSCRIPTION
+  SUPPORT
+  LAINNYA
+}
+
+// Kepemilikan studio: N:N User<->Studio dengan PERSENTASE saham (bukan nilai Rupiah — sesuai
+// JRUWay, kader/pendamping dapat 10-20% tergantung tier galur & level bisnis, dihitung MANUAL
+// oleh admin di luar app). Terpisah dari UserRole karena kepemilikan TIDAK mengharuskan bekerja
+// di studio itu (bisa investor murni tanpa role staf sama sekali).
+model StudioPemilik {
+  id          String   @id @default(cuid())
+  studioId    String
+  userId      String
+  persenSaham Float // 0-100, diisi manual admin
+  keterangan  String? // catatan bebas, mis. "Kader - Bisnis Rintisan" / "Pendamping Tier 2"
+  studio      Studio   @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([studioId, userId])
+}
+
+model StudioMonthlyNote {
+  id         String   @id @default(cuid())
+  studioId   String
+  bulan      Int
+  tahun      Int
+  cpmBulanan Float    @default(0)
+  ekuitas    Float    @default(0)
+  studio     Studio   @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([studioId, bulan, tahun])
+}
+
+model MonthlyEcosystemData {
+  id         String   @id @default(cuid())
+  bulan      Int
+  tahun      Int
+  danaPE     Float    @default(0)
+  danaForum  Float    @default(0)
+  danaBerkah Float    @default(0)
+  rumahUsaha Int      @default(5)
+  catatan    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([bulan, tahun])
+}
+
+// Unit organisasi sejajar/independen dari Circle (bukan bertingkat di dalamnya) — Studio
+// milik SALAH SATU dari keduanya (circleId ATAU rumahUsahaId), divalidasi di controller
+// karena Prisma tidak clean untuk XOR constraint di level DB.
+model RumahUsaha {
+  id             String          @id @default(cuid())
+  nama           String
+  deskripsi      String?
+  alamat         String?
+  mapsUrl        String?
+  kepalId        String? // konsisten sama pola "kepalId" di Circle
+  colorHex       String?
+  statusAktif    Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  orgFundReports OrgFundReport[]
+  studios        Studio[]
+  userRoles      UserRole[]
+  slug                String?  @unique // alamat web circle (bloom → bloom.domain-anda.com); null = belum punya web
+}
+
+// Laporan mingguan dana Circle/Rumah Usaha -- persis pola WeeklyReport studio tapi tanpa
+// breakdown omset per platform, cuma "dana terkini" (mirip KasModal-nya studio). Entitas
+// SALAH SATU dari circleId/rumahUsahaId (XOR divalidasi di controller, sama pola Studio).
+model OrgFundReport {
+  id           String      @id @default(cuid())
+  circleId     String?
+  rumahUsahaId String?
+  periodeAwal  DateTime
+  periodeAkhir DateTime
+  dana         Float       @default(0)
+  pengeluaran  Float       @default(0)
+  catatan      String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  circle       Circle?     @relation(fields: [circleId], references: [id])
+  rumahUsaha   RumahUsaha? @relation(fields: [rumahUsahaId], references: [id])
+
+  @@unique([circleId, periodeAwal])
+  @@unique([rumahUsahaId, periodeAwal])
+}
+
+model StudioRekening {
+  id            String   @id @default(cuid())
+  studioId      String
+  namaBank      String
+  nomorRekening String
+  atasNama      String
+  saldo         Float    @default(0)
+  studio        Studio   @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  updatedAt     DateTime @updatedAt
+  createdAt     DateTime @default(now())
+}
+
+enum StudioTipe {
+  STUDIO
+  PROJECT
+  KORPORASI // unit usaha berbadan hukum (PT) langsung di bawah ekosistem; boleh membawahi unit lain (8 Nov 2026)
+}
+
+model WeeklyReport {
+  id             String   @id @default(cuid())
+  studioId       String
+  userId         String
+  periodeAwal    DateTime
+  periodeAkhir   DateTime
+  omsetFiverr    Float    @default(0)
+  omsetEtsy      Float    @default(0)
+  omsetUpwork    Float    @default(0)
+  omsetVgen      Float    @default(0)
+  omsetKomunitas Float    @default(0)
+  omsetLainnya   Float    @default(0)
+  totalUsd       Float    @default(0)
+  kurs           Float    @default(17000)
+  kasSekarang    Float
+  pengeluaran    Float    @default(0)
+  kendala        String?
+  skorSemangat   Int?
+  studio         Studio   @relation(fields: [studioId], references: [id])
+  createdAt      DateTime @default(now())
+
+  @@unique([studioId, periodeAwal])
+}
+
+model FinancePost {
+  id           String          @id @default(cuid())
+  nama         String
+  adminId      String
+  tipe         FinancePostTipe
+  circleId     String?
+  rumahUsahaId String? // ← baru 20 Juli: Rumah Usaha sejajar Circle sejak 19 Juli tapi
+  namaBank     String? //   FinancePost belum ikut di-update -- Rumah Usaha baru gak
+  noRekening   String? //   pernah bisa punya Pos Keuangan sama sekali sebelum ini
+  namaPemilik  String?
+}
+
+enum FinancePostTipe {
+  INTERNAL
+  EKSTERNAL
+}
+
+enum PaymentStatus {
+  LUNAS
+  BELUM
+  NUNGGAK
+  MENUNGGU
+}
+
+model KoperasiSimpanan {
+  id               String        @id @default(cuid())
+  userId           String?
+  studioId         String?
+  bulan            Int
+  tahun            Int
+  pokok            Float         @default(0)
+  wajib            Float         @default(0)
+  sukarela         Float         @default(0)
+  thr              Float         @default(0)
+  subtotal         Float         @default(0)
+  status           PaymentStatus @default(BELUM)
+  buktiBayar       String?
+  catatanAdmin     String?
+  dilaporkanOleh   String?
+  dikonfirmasiOleh String?
+
+  @@unique([userId, bulan, tahun])
+  @@unique([studioId, bulan, tahun])
+}
+
+model KanbanColumn {
+  id        String   @id @default(cuid())
+  studioId  String
+  nama      String
+  warna     String   @default("#6B7280")
+  urutan    Int      @default(0)
+  createdAt DateTime @default(now())
+  studio    Studio   @relation(fields: [studioId], references: [id])
+}
+
+model KanbanCard {
+  id             String       @id @default(cuid())
+  studioId       String
+  kolomId        String?
+  judul          String
+  platform       String?
+  nilaiOrder     Float?
+  deadline       DateTime?
+  assigneeId     String?
+  status         KanbanStatus @default(TODO)
+  linkBrief      String?
+  linkHasilKarya String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+enum KanbanStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+}
+
+model KaderTimeline {
+  id          String   @id @default(cuid())
+  userId      String
+  tipeEvent   String
+  deskripsi   String
+  tanggal     DateTime
+  dicatatOleh String
+  createdAt   DateTime @default(now())
+}
+
+model Rekrutmen {
+  id               String          @id @default(cuid())
+  namaCalon        String
+  jalurMasuk       JalurMasuk
+  referralDari     String?
+  studioTujuan     String?
+  status           RekrutmenStatus @default(PENDAFTARAN)
+  catatan          String?
+  email            String?
+  nomorWa          String?
+  telegramId       String?
+  tanggalLahir     DateTime?
+  jenisKelamin     String?
+  posisi           String?
+  sudahJadiAnggota Boolean         @default(false)
+  createdAt        DateTime        @default(now())
+}
+
+enum JalurMasuk {
+  LIVE_IN
+  LANGSUNG
+  REFERRAL
+}
+
+enum RekrutmenStatus {
+  PENDAFTARAN
+  SELEKSI
+  DITERIMA
+  DITOLAK
+}
+
+model ProgramPeserta {
+  id            String      @id @default(cuid())
+  userId        String
+  programTipe   ProgramTipe
+  programId     String?
+  mentorId      String
+  studioId      String
+  ortuNama      String?
+  ortuTelegram  String?
+  tanggalMasuk  DateTime    @default(now())
+  targetSelesai DateTime?
+  penilaian     Penilaian[]
+
+  // Karir Anak fields
+  namaLengkap  String?
+  nisn         String?
+  sekolahAsal  String?
+  kelas        String?
+  tanggalLahir DateTime?
+}
+
+enum ProgramTipe {
+  KARIR_ANAK
+}
+
+model Penilaian {
+  id             String         @id @default(cuid())
+  pesertaId      String
+  mentorId       String
+  periode        DateTime
+  kpiData        Json
+  skorKeaktifan  Int?
+  skorDisiplin   Int?
+  skorPenyerapan Int?
+  catatanNaratif String?
+  lampiranUrl    String?
+  peserta        ProgramPeserta @relation(fields: [pesertaId], references: [id])
+  createdAt      DateTime       @default(now())
+}
+
+model Goal {
+  id           String    @id @default(cuid())
+  nama         String
+  targetValue  Float
+  currentValue Float     @default(0)
+  tercapai     Boolean   @default(false)
+  tercapaiAt   DateTime?
+  circleId     String?
+  rumahUsahaId String? // ← baru 20 Juli: Rumah Usaha sejajar Circle sejak 19 Juli, tapi Goal
+  studioId     String? //   belum ikut di-update -- Kepala Rumah Usaha gak bisa bikin goal
+  deadline     DateTime //   level rumah-usaha sama sekali sebelum ini
+  satuan       String
+  createdAt    DateTime  @default(now())
+}
+
+model Milestone {
+  id        String   @id @default(cuid())
+  studioId  String?
+  userId    String?
+  tipe      String
+  deskripsi String
+  tanggal   DateTime @default(now())
+}
+
+model Announcement {
+  id         String             @id @default(cuid())
+  dibuatOleh String
+  judul      String
+  konten     String
+  targetTipe AnnouncementTarget
+  targetId   String?
+  createdAt  DateTime           @default(now())
+}
+
+enum AnnouncementTarget {
+  ALL
+  CIRCLE
+  RUMAH_USAHA // ← baru 20 Juli: sejajar CIRCLE, sebelumnya gak bisa target pengumuman ke Rumah Usaha
+  STUDIO
+  ROLE
+}
+
+model Asset {
+  id         String    @id @default(cuid())
+  studioId   String
+  nama       String
+  tipe       AssetTipe
+  keterangan String?
+  pemegangId String?
+  masaAktif  DateTime?
+  status     String    @default("aktif")
+  // Nilai aset dalam Rupiah (15 Okt 2026). Nilai terkini diisi manual (bukan penyusutan otomatis).
+  // Hanya terlihat oleh pengelola aset -- lihat controllers/asset.js getAll.
+  nilaiBeli    Float?
+  nilaiTerkini Float?
+  // Tanggal beli (15 Okt 2026) -- BEDA dari masaAktif (garansi / masa berlangganan, tanggal ke depan).
+  tanggalBeli  DateTime?
+}
+
+enum AssetTipe {
+  PERALATAN
+  SOFTWARE
+  AKUN_MARKETPLACE
+}
+
+// ARSIP READ-ONLY sejak 30 Juli 2026 -- 4 field naratifnya digabung ke PenilaianKader (lihat
+// komentar model itu), gak ada entri baru dibuat lagi di sini, cuma dipertahankan buat 181
+// entri historis tetap bisa dilihat.
+model JurnalTalent {
+  id                String   @id @default(cuid())
+  userId            String
+  penulisId         String
+  periodeAwal       DateTime
+  periodeAkhir      DateTime
+  perkembangan      String
+  pencapaian        String?
+  kendala           String?
+  targetMingguDepan String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user    User @relation("JurnalUser", fields: [userId], references: [id], onDelete: Cascade)
+  penulis User @relation("JurnalPenulis", fields: [penulisId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([penulisId])
+}
+
+// Penilaian performa kader — DULU terpisah total dari JurnalTalent (naratif mingguan), tapi
+// ternyata dua-duanya sama-sama ditulis mentor (bukan self-report kader), jadi "terpisah" gak
+// benar-benar nambah objektivitas -- cuma bikin mentor isi 2 form buat 1 sesi evaluasi. Digabung
+// 30 Juli 2026: 4 field naratif dari JurnalTalent dipindah ke sini (opsional, gak kayak
+// JurnalTalent.perkembangan yang wajib -- biar tetap bisa isi cuma skor kalau buru-buru).
+// JurnalTalent SENGAJA dibiarkan ada di skema (181 entri historis) tapi jadi arsip read-only,
+// gak ada entri baru lagi -- lihat client/src/pages/Kader/index.jsx tab "Laporan Perkembangan
+// Kader (Arsip)". Sengaja TANPA unique constraint per bulan -- ekspektasinya minimal 1x sebulan,
+// tapi itu soft-rule yang ditandai di tampilan (skor-ringkasan endpoint), bukan dipaksa lewat
+// database. Mentor boleh isi kapan aja, boleh lebih dari sekali sebulan kalau dibutuhkan.
+model PenilaianKader {
+  id                  String   @id @default(cuid())
+  userId              String
+  penilaiId           String
+  tanggalPenilaian    DateTime
+  // A. Kehadiran & Kedisiplinan
+  skorKehadiran       Int
+  skorKetepatanWaktu  Int
+  // B. Adab & Karakter
+  skorAdab            Int
+  skorKejujuran       Int
+  skorMenerimaMasukan Int
+  // C. Kompetensi Teknis
+  skorKualitasKerja   Int
+  skorPenguasaanSkill Int
+  // D. Kolaborasi & Inisiatif
+  skorInisiatif       Int
+  skorKerjaSama       Int
+  catatan             String?
+  // Naratif (opsional) -- eks-JurnalTalent, digabung 30 Juli 2026
+  perkembangan        String?
+  pencapaian          String?
+  kendala             String?
+  targetMingguDepan   String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user    User @relation("PenilaianUser", fields: [userId], references: [id], onDelete: Cascade)
+  penilai User @relation("PenilaianPenilai", fields: [penilaiId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([penilaiId])
+}
+
+model Modul {
+  id        String   @id @default(cuid())
+  judul     String
+  deskripsi String?
+  linkDrive String
+  kategori  String
+  aksesRole String   @default("SEMUA") // SEMUA | KOORDINATOR | KEPALA_CIRCLE
+  urutan    Int      @default(0)
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// userId/studioId: link ini milik SALAH SATU (orang -- sosmed pribadi, ATAU studio -- akun kerja
+// kayak Fiverr/Etsy/Upwork/VGen), XOR divalidasi di controller. Aset studio cuma boleh dilihat
+// Koordinator ke atas, sosmed pribadi terbuka buat semua orang.
+model SosmedLink {
+  id        String   @id @default(cuid())
+  userId    String?
+  studioId  String?
+  platform  String // Fiverr | Etsy | Upwork | VGen | Instagram | TikTok | YouTube | LinkedIn | Website | Lainnya
+  url       String
+  username  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Memori {
+  id        String   @id @default(cuid())
+  judul     String
+  konten    String
+  tipe      String   @default("Lainnya") // Keputusan Rapat | SOP & Prosedur | Sejarah | Lessons Learned | Catatan Penting | Lainnya
+  tanggal   DateTime @default(now())
+  tags      String?
+  authorId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TelegramGroup {
+  id             String           @id @default(cuid())
+  studioId       String?
+  circleId       String?
+  tipeGrup       TelegramGrupTipe
+  telegramChatId String           @unique
+  namaGrup       String
+}
+
+enum TelegramGrupTipe {
+  GENERAL
+  WEEKLY_OMZET
+  STUDIO
+  PENDAMPINGAN
+  ANGGOTA
+}
+
+enum DanaPengembanganTipe {
+  TRADER_MANUAL
+  BOT_CRYPTO
+  SAHAM
+  LAINNYA
+}
+
+// Singleton row (id tetap 'dp-pool-main', di-seed lewat migration) — total dana yang
+// sengaja dikeluarkan dari pembukuan resmi ekosistem untuk dikelola/diinvestasikan.
+model DanaPengembanganPool {
+  id           String   @id @default(cuid())
+  totalPool    Float    @default(405000000) // ← Rp, catatan historis nominal asli yang disisihkan dari ekosistem
+  totalPoolUsd Float    @default(0) // ← USD, angka UTAMA yang dipakai untuk hitung Sudah/Belum Dialokasikan — diisi langsung, TIDAK diturunkan dari kurs (kursnya sering tidak diketahui persis)
+  kurs         Float    @default(17000) // ← kurs live saat ini, dipakai untuk valuasi/konversi equity terkini semua unit ke Rupiah
+  catatan      String?
+  updatedBy    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// Satu "unit" = satu trader manual, bot crypto, akun saham, dst.
+// Modal & saldo dicatat dalam USD (konsisten dgn instrumen trading/crypto), dikonversi ke Rp pakai Pool.kurs.
+model DanaPengembanganUnit {
+  id           String                      @id @default(cuid())
+  nama         String
+  tipe         DanaPengembanganTipe
+  pengelolaId  String
+  modalAwalUsd Float                       @default(0)
+  statusAktif  Boolean                     @default(true)
+  keterangan   String?
+  pengelola    User                        @relation("DanaPengembanganUnitPengelola", fields: [pengelolaId], references: [id])
+  laporan      DanaPengembanganLaporan[]
+  transaksi    DanaPengembanganTransaksi[]
+  createdAt    DateTime                    @default(now())
+  updatedAt    DateTime                    @updatedAt
+}
+
+// Laporan mingguan per unit (biasanya Sabtu) — equity terkini "sumber kebenaran" selalu dari
+// laporan terbaru, tidak ada denormalisasi di Unit. equityUsd dalam USD, konversi Rp pakai Pool.kurs saat ini.
+// P/L mingguan = equityUsd laporan ini - equityUsd laporan sebelumnya (dihitung di client, tidak disimpan).
+model DanaPengembanganLaporan {
+  id             String               @id @default(cuid())
+  unitId         String
+  periodeAwal    DateTime
+  periodeAkhir   DateTime
+  equityUsd      Float
+  prosesnya      String
+  dilaporkanOleh String
+  unit           DanaPengembanganUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  createdAt      DateTime             @default(now())
+
+  @@unique([unitId, periodeAwal])
+}
+
+enum DanaPengembanganTransaksiTipe {
+  DEPOSIT
+  WITHDRAW
+}
+
+// Riwayat dana masuk (top-up modal) / keluar (penarikan) dari unit — dicatat terpisah dari
+// laporan equity mingguan supaya P/L trading tidak tercampur dengan pergerakan modal murni.
+// kurs di sini HISTORIS per transaksi (kurs saat itu terjadi) — beda dari Pool.kurs yang cuma
+// buat valuasi live equity saat ini.
+model DanaPengembanganTransaksi {
+  id          String                        @id @default(cuid())
+  unitId      String
+  tipe        DanaPengembanganTransaksiTipe
+  tanggal     DateTime
+  jumlahUsd   Float
+  kurs        Float
+  keterangan  String?
+  dicatatOleh String
+  unit        DanaPengembanganUnit          @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  createdAt   DateTime                      @default(now())
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// MODUL PRODUKSI (Order Tracking per Studio) — Fase 1, ditambahkan 7 Agustus 2026
+// Payroll/THP MENYUSUL di fase terpisah, TIDAK termasuk di sini.
+// ══════════════════════════════════════════════════════════════════════════
+
+// Diubah 7 Agustus 2026 dari 2 kategori (INTERNAL/EKSTERNAL) jadi 3 -- INTERNAL_EKOSISTEM (studio
+// kita sendiri, klienStudioId keisi), INTERNAL_JRU_LAIN (studio di ekosistem JRU lain, BUKAN
+// bagian dari Ekosistem -- klien teks bebas, klienStudioId TETAP null), EKSTERNAL (klien di luar
+// jaringan JRU sama sekali). OrderProduksi masih kosong pas migrasi ini dibuat, gak perlu backfill.
+enum TipeKlienProduksi {
+  INTERNAL_EKOSISTEM
+  INTERNAL_JRU_LAIN
+  EKSTERNAL
+}
+
+enum StatusOrderProduksi {
+  MASUK
+  PROSES
+  SELESAI
+  BATAL
+}
+
+// Status pembayaran invoice -- TERPISAH TOTAL dari status (kerja selesai != invoice lunas).
+// Fase 3 (8 Agustus 2026). JANGAN pakai enum PaymentStatus yang sudah ada (LUNAS/BELUM/
+// NUNGGAK/MENUNGGU) -- itu punya KoperasiSimpanan, domain beda (iuran koperasi anggota).
+enum StatusBayarProduksi {
+  BELUM_LUNAS
+  DP
+  LUNAS
+}
+
+// Akun platform (Fiverr/Etsy/dst) tempat order masuk -- satu studio bisa punya beberapa akun/
+// platform, feePersen dipakai controller buat hitung nilaiBersih dari nilaiKotor (JANGAN percaya
+// nilaiBersih dari frontend, lihat controllers/produksi.js).
+model AkunProduksi {
+  id        String          @id @default(cuid())
+  studioId  String
+  studio    Studio          @relation(fields: [studioId], references: [id])
+  platform  String
+  namaAkun  String
+  feePersen Float           @default(0.2)
+  createdAt DateTime        @default(now())
+  orders    OrderProduksi[]
+
+  @@unique([studioId, namaAkun])
+  leads     MarketingLead[] @relation("LeadAkun")
+  penugasanMarketer PenugasanAkunMarketer[]
+  aktivitasMarketer AktivitasMarketer[]
+  targetMarketing   TargetMarketing[]
+}
+
+model OrderProduksi {
+  isianKhusus      Json? // kolom khusus order per studio (KolomKhususOrder.id → nilai), 12 Nov 2026 — mis. "Boleh pakai AI?" = Ya/Tidak
+  id             String               @id @default(cuid())
+  updateKlien    UpdateKlien[]
+  // 10 Nov 2026 (masukan tim): klien batal TAPI pekerjaan sudah jalan → order ditutup (tahap Selesai), tetap dihitung, ditandai Cancel
+  // 10 Nov 2026 (masukan tim): uang yang benar-benar masuk untuk order ini (setelah potongan platform). Bila diisi, jadi acuan Lunas menggantikan perkiraan nilaiBersih.
+  uangMasukRiil  Float?
+  cancelKlien    Boolean              @default(false)
+  cancelPada     DateTime?
+  alasanCancel   String?
+  studioId       String
+  studio         Studio               @relation(fields: [studioId], references: [id])
+  akunId         String
+  akun           AkunProduksi         @relation(fields: [akunId], references: [id])
+  tipeKlien      TipeKlienProduksi    @default(EKSTERNAL)
+  klienStudioId  String?
+  klienStudio    Studio?              @relation("KlienInternal", fields: [klienStudioId], references: [id])
+  // klienId/klienRef -- CUMA keisi kalau tipeKlien=EKSTERNAL (lihat findOrCreateKlien di
+  // utils/produksi.js). Nama relasinya "klienRef" (bukan "klienProduksi") biar gak rancu baca
+  // berdampingan sama field `klien` (teks, tetap sumber tampilan) dan `klienStudio` (FK buat
+  // INTERNAL_EKOSISTEM) di baris yang sama. INTERNAL_JRU_LAIN TETAP teks bebas, gak dapat FK ini.
+  klienId        String?
+  klienRef       KlienProduksi?       @relation(fields: [klienId], references: [id])
+  klien          String
+  judul          String
+  kategori       String?
+  nilaiKotor     Float
+  nilaiBersih    Float
+  status         StatusOrderProduksi  @default(MASUK)
+  subStatus      String?
+  // Alur proses web circle (19 Okt 2026): tahap kerja aktif (templat per studio). subStatus diisi nama tahap
+  // supaya halaman Produksi lama tetap menampilkannya; status besar mengikuti jenis tahap.
+  tahapId         String?
+  tahap           TahapProduksi?       @relation(fields: [tahapId], references: [id], onDelete: SetNull)
+  nilaiDisepakati Float? // nilai di inbox (sebelum jadi order); nilaiKotor/nilaiBersih = nilai riil
+  revisiKe        Int                  @default(0)
+  tahapAktif      String[]             @default([]) // id tahap OPSIONAL yang dinyalakan untuk order ini; kosong = ikut aktifBawaan templat
+  riwayatTahap    RiwayatTahapOrder[]
+  auditOrder      AuditOrder[]
+  itemOrder       ItemOrder[]
+  penugasanTahap  PenugasanTahap[]
+  genre           String? // keahlian genre untuk penugasan otomatis (OGS genre)
+  tautan          String[] @default([]) // tautan kerja/hasil (http/https, maks 10) — OGS item links
+  mataUang        String   @default("IDR") // IDR | USD — semua nilai uang tetap tersimpan dalam Rupiah; USD hanya metadata asal
+  kurs            Float?   // Rp per 1 USD saat order dicatat (bila USD)
+  nilaiUsd        Float?   // nilai kotor dalam USD (bila USD)
+  kesulitan       String? // MUDAH | SEDANG | SULIT (OGS difficulty easy/medium/hard)
+  terminBayar     TerminBayarOrder[]
+  catatanOrder    CatatanOrder[]
+  tanggalMasuk   DateTime             @default(now())
+  deadline       DateTime?
+  tanggalSelesai DateTime?
+  // Fase 3 -- tracking pembayaran, terpisah dari `status` (kerja) di atas. dpAmount cuma
+  // relevan kalau statusBayar=DP tapi TIDAK di-enforce di DB. tanggalLunas auto-isi/kosong
+  // ngikutin transisi statusBayar di updateOrder (pola SAMA PERSIS tanggalSelesai/status) --
+  // TIDAK di-auto-isi di createOrder (sama kayak tanggalSelesai).
+  statusBayar    StatusBayarProduksi  @default(BELUM_LUNAS)
+  dpAmount       Float?
+  tanggalLunas   DateTime?
+  catatan        String?
+  // Fase 2 (Marketing) -- siapa yang closing deal ini, TERPISAH dari assignments (talent yang
+  // NGERJAIN). Keisi otomatis pas convertLead (dari MarketingLead.marketerId), TAPI juga bisa
+  // diisi manual buat order yang gak lewat pipeline Marketing sama sekali.
+  marketerId     String?
+  marketer       User?                @relation(fields: [marketerId], references: [id])
+  leadMarketing  MarketingLead? // reverse dari MarketingLead.orderId -- FK-nya di sisi sana
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  assignments    AssignmentProduksi[]
+  catatanLembur  CatatanLembur[] // Modul Payroll (Fase 3, 7 Agustus 2026) -- entri lembur yang ngerujuk order ini, opsional
+
+  @@index([akunId, status])
+  @@index([deadline])
+  @@index([klienStudioId])
+  @@index([klienId])
+  @@index([statusBayar])
+  @@index([marketerId])
+}
+
+// FREELANCER_PERORANGAN -- satu orang lepas, namaEksternal teks bebas.
+// STUDIO_LAIN -- studio JRU lain yang ngerjain (lihat model StudioJruLain buat daftar
+// referensinya), namaEksternal juga teks bebas (TIDAK ada FK ke StudioJruLain -- combobox di UI
+// cuma bantu isi teksnya, nama yang gak ketemu di daftar tetap boleh diketik manual).
+enum TipeEksternalProduksi {
+  FREELANCER_PERORANGAN
+  STUDIO_LAIN
+}
+
+model AssignmentProduksi {
+  id                String                 @id @default(cuid())
+  orderId           String
+  order             OrderProduksi          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  userId            String? // opsional -- kosong kalau talent-nya freelancer luar ekosistem (lihat namaEksternal)
+  user              User?                  @relation(fields: [userId], references: [id])
+  namaEksternal     String? // nama freelancer luar ekosistem (teks bebas), diisi kalau userId kosong
+  tipeEksternal     TipeEksternalProduksi? // WAJIB diisi kalau namaEksternal diisi (divalidasi di controller, bukan di DB)
+  // talentEksternalId -- CUMA keisi kalau tipeEksternal=FREELANCER_PERORANGAN (lihat
+  // findOrCreateTalentEksternal di utils/produksi.js). STUDIO_LAIN TETAP teks bebas + StudioJruLain
+  // combobox seperti sekarang, gak dapat FK ini.
+  talentEksternalId String?
+  talentEksternal   TalentEksternal?       @relation(fields: [talentEksternalId], references: [id])
+  // 10 Nov 2026 (tim per tahap, permintaan tim 3D): tahap yang DIKERJAKAN orang ini (id TahapProduksi jenis KERJA/FINALISASI; revisi & QC mengikuti induknya). Kosong = semua tahap kerja (perilaku lama).
+  tahapKerjaIds     String[]               @default([])
+  peran             String?
+  feeTalent         Float? // budget/fee spesifik orang ini di order ini, boleh kosong
+  createdAt         DateTime               @default(now())
+
+  // Fase 4a -- status bayar STUDIO->freelancer, arah kebalikan Fase 3 (OrderProduksi.statusBayar
+  // = KLIEN->studio). Reuse enum StatusBayarProduksi (bukan bikin baru) -- domainnya sama
+  // (Produksi), cuma arah uangnya kebalik. Pola auto-fill tanggalDibayar SAMA PERSIS
+  // tanggalLunas/statusBayar di updateOrder (lihat updateAssignment).
+  statusBayar    StatusBayarProduksi @default(BELUM_LUNAS)
+  dpAmount       Float?
+  tanggalDibayar DateTime?
+
+  // 14 Nov 2026 (masukan tim): talent BERHENTI di tengah order — tetap tercatat (nama, fee, riwayat, Bayar freelance) tetapi keluar dari
+  // antrean & tidak menerima tahap berikutnya; semua daftar "talent aktif" menyaring berhentiPada = null. Kosong = aktif.
+  berhentiPada   DateTime?
+  berhentiOleh   String?
+  alasanBerhenti String?
+  // AJUAN BAYAR FREELANCE (16 Nov 2026, masukan tim): admin menyiapkan pembayaran (DP berapa / Lunas), Koordinator tinggal transfer & klik
+  // "Sudah dibayar" dari Tugas saya › Bayar freelance (yang mencatat biaya unit). Satu ajuan aktif per freelance; dihapus saat dibayar/dibatalkan.
+  ajuanJenis    String?   // DP | LUNAS
+  ajuanJumlah   Float?
+  ajuanCatatan  String?
+  ajuanOleh     String?
+  ajuanPada     DateTime?
+
+  // @@unique([orderId, userId]) DIHAPUS 7 Agustus 2026 -- 1 orang boleh punya beberapa baris
+  // assignment di order yang sama, dibedakan lewat `peran` (mis. "Modeling" vs "Revisi
+  // Modeling"), masing-masing bisa punya feeTalent terpisah.
+
+  @@index([talentEksternalId])
+}
+
+// Akses kelola order (create/update/delete/assignment) untuk 1 studio TANPA butuh role
+// KOORDINATOR ke atas -- buat orang yang ditunjuk khusus urus pemasaran/tracking order studio
+// itu (mis. KADER yang dikasih tanggung jawab "Admin Market") walau role organisasinya sendiri
+// gak berubah. CUMA berlaku buat operasi order, BUKAN bypass buat endpoint lain (akun produksi,
+// dashboard, dll tetap KOORDINATOR ke atas biasa). Baris di sini SENGAJA cuma bisa
+// dikelola KOORDINATOR ke atas (lihat controllers/produksi.js) -- Admin Market gak boleh kasih
+// akses ke diri sendiri/orang lain.
+model ProduksiAdminMarket {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  studioId  String
+  studio    Studio   @relation(fields: [studioId], references: [id])
+  akunIds   String[] @default([]) // web circle (12 Nov 2026): akun jualan yang dipegang admin ini — kosong = semua order unit
+  createdAt DateTime @default(now())
+
+  @@unique([userId, studioId])
+}
+
+// Override akses Superadmin KHUSUS modul Produksi/Payroll (bukan ekosistem-wide) -- buat orang
+// tertentu yang butuh akses penuh 2 modul ini (mis. dashboard lintas-studio, menu yang biasanya
+// SUPER_ADMIN-only) TANPA jadi ADVISOR/KEPALA_EKOSISTEM beneran (yang bakal bawa privilege
+// ekosistem-wide di modul LAIN juga -- Finance, Koperasi, dll TIDAK terpengaruh baris ini sama
+// sekali, lihat isProduksiSuperUser() di utils/roles.js). 1 baris per user (userId @unique).
+model ProduksiSuperOverride {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  catatan   String? // alasan/konteks pemberian akses, buat audit trail
+  createdAt DateTime @default(now())
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// MODUL PAYROLL & THP -- Fase 3 bagian 1/2, ditambahkan 7 Agustus 2026
+// Bagian 1: rate card lembur + catatan lembur. Model Penggajian sudah ditambahkan di sini
+// (skema saja) TAPI belum ada API/controller-nya -- itu bagian 2/2, MENYUSUL.
+// ══════════════════════════════════════════════════════════════════════════
+
+enum StatusPenggajian {
+  DRAFT
+  FINAL
+  DIBAYAR
+}
+
+model RateCardLembur {
+  id            String          @id @default(cuid())
+  studioId      String
+  studio        Studio          @relation(fields: [studioId], references: [id])
+  level         String
+  keterangan    String?
+  fee           Float
+  aktif         Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  catatanLembur CatatanLembur[]
+
+  @@unique([studioId, level])
+}
+
+// feeSaatItu SENGAJA disalin dari rateCard.fee pas entry dibuat (bukan cuma nyimpan rateCardId
+// terus baca fee live tiap kali) -- kalau koordinator ubah fee rate card BELAKANGAN, entri lembur
+// yang UDAH ada gak boleh ikut berubah nilainya, harus tetap kepake fee yang berlaku pas lembur
+// itu terjadi. feeAkhir dihitung SEKALI di controller dari feeSaatItu * (progresAkhir-progresAwal),
+// bukan dihitung ulang tiap dibaca.
+model CatatanLembur {
+  id           String         @id @default(cuid())
+  userId       String
+  user         User           @relation(fields: [userId], references: [id])
+  penggajianId String?
+  penggajian   Penggajian?    @relation(fields: [penggajianId], references: [id])
+  rateCardId   String
+  rateCard     RateCardLembur @relation(fields: [rateCardId], references: [id])
+  feeSaatItu   Float
+  orderId      String?
+  order        OrderProduksi? @relation(fields: [orderId], references: [id])
+  klien        String?
+  briefName    String?
+  tanggal      DateTime
+  progresAwal  Float
+  progresAkhir Float
+  feeAkhir     Float
+  catatan      String?
+  createdAt    DateTime       @default(now())
+}
+
+// Model skema Fase 3 bagian 1 -- API/controller-nya BELUM dibuat (menyusul bagian 2/2), tapi
+// relasi baliknya (catatanLembur) sudah dipakai CatatanLembur.penggajianId di atas.
+model Penggajian {
+  id               String                @id @default(cuid())
+  userId           String
+  user             User                  @relation(fields: [userId], references: [id])
+  studioId         String
+  studio           Studio                @relation(fields: [studioId], references: [id])
+  bulan            Int
+  tahun            Int
+  gajiPokok        Float                 @default(0)
+  bonus            Float                 @default(0)
+  komisi           Float                 @default(0)
+  lembur           Float                 @default(0)
+  shu              Float                 @default(0)
+  // Tunjangan (7 Agustus 2026, revisi Fase 3) -- SENGAJA BUKAN kolom tetap lagi (tunjanganKos dkk
+  // dihapus). Studio beda-beda punya jenis tunjangan beda-beda (data Financial Forecasting nyata:
+  // Abstractlab pakai BPJS, Mikamizu pakai Beras 2,5kg) -- gak bisa dipaksa ke 5 kategori tetap.
+  // Lihat TunjanganTemplate (per studio) & TunjanganPenggajian (baris dinamis per orang/bulan).
+  tunjangan        TunjanganPenggajian[]
+  potongan         Float                 @default(0)
+  thp              Float
+  status           StatusPenggajian      @default(DRAFT)
+  buktiBayar       String?
+  tanggalBayar     DateTime?             @db.Date // jadwal/tanggal gajian (bawaan tgl 27 bulan slip; diatur koordinator di web circle)
+  tanggalBayarShu  DateTime?             @db.Date // SHU dibayar terpisah (beda tiap studio); kosong = ikut tanggal gajian
+  dilaporkanOleh   String?
+  dikonfirmasiOleh String?
+  catatan          String?
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  catatanLembur    CatatanLembur[]
+  lemburPresensi   LemburKehadiran[]
+
+  @@unique([userId, studioId, bulan, tahun])
+}
+
+// Fase 4b (Financial Forecasting) -- rencana kas per studio per bulan, TERPISAH dari Penggajian
+// (itu realisasi gaji SUDAH dibayar; ini rencana ke depan, dicek lawan realisasi). Nilai SELALU
+// Rupiah -- Produksi module gak pernah pegang nilai USD di mana pun (beda dari WeeklyReport/
+// DanaPengembangan yang punya field kurs), jadi SENGAJA TIDAK ada field kurs di sini walau ada di
+// sheet aslinya -- gak ada fungsi nyata buat field itu di model data sistem ini. Minggu 1-4 =
+// pembagian TETAP hari-ke-bulan (1-7/8-14/15-21/22-akhir), BUKAN minggu kalender Senin-Minggu
+// kayak WeeklyReport -- dua sistem beda tujuan, sengaja gak disamakan.
+model RencanaKas {
+  id                        String   @id @default(cuid())
+  studioId                  String
+  studio                    Studio   @relation(fields: [studioId], references: [id])
+  bulan                     Int
+  tahun                     Int
+  estimasiPengeluaran       Float    @default(0)
+  estimasiPendapatanMinggu1 Float    @default(0)
+  estimasiPendapatanMinggu2 Float    @default(0)
+  estimasiPendapatanMinggu3 Float    @default(0)
+  estimasiPendapatanMinggu4 Float    @default(0)
+  catatan                   String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  @@unique([studioId, bulan, tahun])
+}
+
+// Daftar jenis tunjangan per studio (mis. Abstractlab: Kos/Makan/Komunikasi/Laundry-Transport/
+// BPJS; Mikamizu: Kos/Makan/Komunikasi/Laundry-Transport/Beras) -- pola sama persis
+// RateCardLembur (per studio, aktif/nonaktif, bukan hard delete). Dipakai buat auto-generate
+// baris TunjanganPenggajian tiap kali Penggajian baru dibuat.
+model TunjanganTemplate {
+  id        String                @id @default(cuid())
+  studioId  String
+  studio    Studio                @relation(fields: [studioId], references: [id])
+  nama      String
+  aktif     Boolean               @default(true)
+  createdAt DateTime              @default(now())
+  baris     TunjanganPenggajian[]
+
+  @@unique([studioId, nama])
+}
+
+// Baris tunjangan aktual per Penggajian -- nama DISALIN dari template pas dibuat (bukan baca
+// template.nama live), pola sama kayak feeSaatItu di CatatanLembur: kalau template di-rename
+// belakangan, baris lama yang udah ada tetap nunjukkin nama yang berlaku pas dibuat. templateId
+// boleh null -- baris tunjangan ad-hoc/one-off yang bukan dari template resmi tetap bisa
+// ditambahkan manual per orang.
+model TunjanganPenggajian {
+  id           String             @id @default(cuid())
+  penggajianId String
+  rincianId    String? // asal dari RincianGajiTetap (komponen TETAP); null = baris tambahan bulan itu
+  penggajian   Penggajian         @relation(fields: [penggajianId], references: [id], onDelete: Cascade)
+  templateId   String?
+  template     TunjanganTemplate? @relation(fields: [templateId], references: [id])
+  nama         String
+  jumlah       Float              @default(0)
+  createdAt    DateTime           @default(now())
+}
+
+// Daftar referensi studio JRU lain (di luar Ekosistem) -- dukung mode "Studio Lain" di
+// AssignmentProduksi.tipeEksternal (combobox autocomplete, lihat controllers/produksi.js
+// getStudioJruLain). SENGAJA TIDAK ada FK dari AssignmentProduksi ke sini -- ini murni daftar
+// bantu ketik, bukan sumber kebenaran wajib (nama yang gak ketemu di sini tetap boleh diketik
+// manual di AssignmentProduksi.namaEksternal).
+model StudioJruLain {
+  id        String   @id @default(cuid())
+  circle    String
+  nama      String
+  aktif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([circle, nama])
+}
+
+// Fase 1 (Fondasi Klien/Talent, 8 Agustus 2026) -- klien eksternal OrderProduksi (tipeKlien=
+// EKSTERNAL doang, lihat komentar OrderProduksi.klienRef) sebagai entitas persisten, bukan teks
+// bebas -- biar riwayat/agregasi per klien bisa dihitung nanti. Studio-scoped (beda dari
+// TalentEksternal di bawah yang ekosistem-wide) karena relasi klien tiap studio ke market-nya
+// masing-masing terpisah. Baris di sini terkumpul OTOMATIS lewat findOrCreateKlien
+// (utils/produksi.js) tiap kali order EKSTERNAL dibuat/diedit -- TIDAK ada halaman "Tambah Klien"
+// terpisah di fase ini, sama filosofi StudioJruLain di atas.
+model KlienProduksi {
+  id        String          @id @default(cuid())
+  studioId  String
+  studio    Studio          @relation(fields: [studioId], references: [id])
+  nama      String
+  // 10 Nov 2026 (masukan tim): direktori klien — nickname & asal order (platform/akun tempat klien datang, mis. Fiverr, WhatsApp)
+  panggilan String?
+  asal      String?
+  kontak    String?
+  catatan   String?
+  aktif     Boolean         @default(true)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  orders    OrderProduksi[]
+  leads     MarketingLead[] // Fase 2 (Marketing, 8 Agustus 2026)
+
+  @@unique([studioId, nama])
+}
+
+// Fase 2 (Marketing, 8 Agustus 2026) -- pipeline lead SEBELUM jadi order, terpisah dari
+// OrderProduksi tapi numpang di KlienProduksi di atas via findOrCreateKlien yang sama persis.
+// `klien` (BUKAN `nama`) SENGAJA meniru nama field OrderProduksi.klien -- lead ini yang NANTI
+// JADI order pas convert, bukan konsep beda, jadi nama field-nya harus konsisten. `sumber` teks
+// bebas (BUKAN reuse AkunProduksi -- itu gak punya flag aktif & feePersen gak relevan buat deal
+// yang belum pasti). Begitu status=CONVERTED, row ini READ-ONLY total (lihat updateLead/
+// deleteLead di controllers/marketing.js) -- Order jadi source of truth, bukan Lead lagi.
+enum StatusLeadMarketing {
+  DISCUSSING
+  FOLLOW_UP
+  NEGO
+  CONVERTED
+  LOST
+}
+
+model MarketingLead {
+  id                      String              @id @default(cuid())
+  studioId                String
+  studio                  Studio              @relation(fields: [studioId], references: [id])
+  klienId                 String?
+  klienRef                KlienProduksi?      @relation(fields: [klienId], references: [id])
+  klien                   String
+  sumber                  String?
+  kontak                  String?
+  estimasiNilai           Float?
+  status                  StatusLeadMarketing @default(DISCUSSING)
+  catatan                 String?
+  tanggalMasuk            DateTime            @default(now())
+  tanggalFollowUpTerakhir DateTime?
+  marketerId              String?
+  marketer                User?               @relation(fields: [marketerId], references: [id])
+  orderId                 String?             @unique
+  order                   OrderProduksi?      @relation(fields: [orderId], references: [id])
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+
+  @@index([studioId, status])
+  @@index([klienId])
+  // Web circle (20 Okt 2026): satu entitas prospek (lead Ekosistem = prospek OGS)
+  platform                String? // kanal chat pertama (Fiverr/Vgen/Etsy/X/IG/…)
+  akunId                  String? // akun marketplace tempat prospek masuk
+  akun                    AkunProduksi? @relation("LeadAkun", fields: [akunId], references: [id], onDelete: SetNull)
+  // 9 Nov 2026: estimasi boleh dalam USD (nilaiUsd × kurs); estimasiNilai tetap Rupiah hasil konversi. null/IDR = Rupiah.
+  mataUang                String?
+  nilaiUsd                Float?
+  kurs                    Float?
+  // 13 Nov 2026 (masukan tim): isian prospek = isian Tambah order, terbawa saat "Jadikan order"
+  judul                   String?
+  tipeKlien               String?
+  deadline                DateTime?
+  talentUserId            String?
+  namaFreelance           String?
+}
+
+// Fase 1 (Fondasi Klien/Talent, 8 Agustus 2026) -- freelancer perorangan eksternal
+// (AssignmentProduksi.tipeEksternal=FREELANCER_PERORANGAN doang, BUKAN STUDIO_LAIN yang tetap
+// pakai StudioJruLain) sebagai entitas persisten. SENGAJA ekosistem-wide (TANPA studioId, beda
+// dari KlienProduksi di atas) -- satu freelancer bisa kerja lintas studio, dan agregasi saldo
+// (Fase 4 Payroll -- total tagihan/dibayar/outstanding) butuh SATU identitas yang sama dipakai
+// lintas semua assignment-nya, bukan baris terpisah per studio. `nama` SENGAJA TIDAK @@unique
+// (beda dari KlienProduksi) -- nama depan orang gampang collide (ada beberapa "Budi"/"Andi"
+// beneran berbeda), kolisi harus boleh jadi 2 baris terpisah, bukan dipaksa constraint database
+// jadi 1 orang yang salah. Terkumpul otomatis lewat findOrCreateTalentEksternal, sama filosofi
+// KlienProduksi.
+model TalentEksternal {
+  id               String               @id @default(cuid())
+  nama             String
+  kontak           String?
+  bank             String?
+  noRekening       String?
+  atasNamaRekening String?
+  catatan          String?
+  // 10 Nov 2026 (masukan tim): data induk freelancer diisi lebih dulu oleh admin; skill = kategori unit ("A + B"), lingkup = circle/rumah usaha pencatat
+  skill            String?
+  tautanPorto      String?
+  lingkupKunci     String?
+  // 13 Nov 2026 (masukan tim): unit pencatat (pemilik data); unit lain di circle hanya melihat bila bagikan = true
+  studioId         String?
+  bagikan          Boolean              @default(false)
+  aktif            Boolean              @default(true)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  assignments      AssignmentProduksi[]
+
+  @@index([nama])
+  @@index([studioId])
+}
+
+// Raport siswa Vokasi/KBU per 3 bulan (13 Okt 2026), format mengikuti raport Karir Anak yang sudah
+// berjalan: Renstra Belajar (rencana periode ini + evaluasinya), Perkembangan Personal (12 aspek
+// tetap, skor 1-10 + deskripsi), Perkembangan Teknis (kompetensi per fokus, 1-10 + deskripsi),
+// Renstra Selanjutnya (jadi Renstra Belajar raport berikutnya), Input Mentor, Kesan Belajar (ditulis
+// siswa), Lampiran Karya. Identitas dibekukan saat TERBIT. Penilaian Kader hanya jadi acuan di form.
+model RaportSiswa {
+  id                 String       @id @default(cuid())
+  userId             String
+  penulisId          String?
+  tahun              Int
+  kuartal            Int // 1 = Jan-Mar, 2 = Apr-Jun, 3 = Jul-Sep, 4 = Okt-Des
+  status             StatusRaport @default(DRAFT)
+  renstraBelajar     Json         @default("[]") // [{ teknis, nonTeknis, checklist }] x 3 bulan
+  personal           Json         @default("[]") // [{ kunci, skor 1-10, deskripsi }]
+  teknis             Json         @default("[]") // [{ nama, skor 1-10, deskripsi }]
+  renstraSelanjutnya Json         @default("[]") // [{ teknis, nonTeknis, checklist }] x 3 bulan
+  untukSiswa         String?      @db.Text
+  untukOrangTua      String?      @db.Text
+  kesanBelajar       String?      @db.Text
+  identitas          Json?
+  terbitAt           DateTime?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  user     User             @relation("RaportSiswa", fields: [userId], references: [id], onDelete: Cascade)
+  penulis  User?            @relation("RaportPenulis", fields: [penulisId], references: [id], onDelete: SetNull)
+  lampiran RaportLampiran[]
+
+  @@unique([userId, tahun, kuartal])
+  @@index([penulisId])
+}
+
+// Foto karya untuk halaman "Lampiran Karya" -- disimpan sebagai data URL (dikecilkan di peramban,
+// pola FotoSampul), BUKAN di /uploads yang publik: karyanya aset milik studio pengampu siswa.
+model RaportLampiran {
+  id         String   @id @default(cuid())
+  raportId   String
+  dataUrl    String
+  keterangan String?
+  urutan     Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  raport RaportSiswa @relation(fields: [raportId], references: [id], onDelete: Cascade)
+
+  @@index([raportId])
+}
+
+// Mentor siswa Vokasi/KBU (13 Okt 2026) -- satu siswa bisa punya beberapa mentor; semuanya boleh
+// menulis raport siswa itu. Ditunjuk oleh pengelola unit di SDM › Raport Siswa.
+model MentorSiswa {
+  siswaId   String
+  mentorId  String
+  createdAt DateTime @default(now())
+
+  siswa  User @relation("MentorSiswaSiswa", fields: [siswaId], references: [id], onDelete: Cascade)
+  mentor User @relation("MentorSiswaMentor", fields: [mentorId], references: [id], onDelete: Cascade)
+
+  @@id([siswaId, mentorId])
+  @@index([mentorId])
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// ALUR PROSES WEB CIRCLE (19 Okt 2026) — templat tahap per studio + riwayat tiap order.
+// Acuan: Daily Update PiBi (Inbox → Pengerjaan → Preview → Revisi → Done, + Hold) dan OGS.
+// ══════════════════════════════════════════════════════════════════════════
+enum JenisTahap {
+  MASUK            // inbox / antrian
+  KERJA            // tahap pengerjaan utama (boleh banyak: Sketch, Line Art, Modeling, ...)
+  QC               // gerbang cek internal setelah tahap kerja (induk = tahap KERJA-nya)
+  REVISI_INTERNAL  // QC gagal → diperbaiki lalu kembali ke QC
+  PREVIEW_KLIEN    // klien melihat hasil
+  REVISI_KLIEN     // klien minta revisi → kembali ke Preview Klien
+  MENUNGGU_KLIEN   // menunggu brief/pembayaran/balasan klien (dipegang marketer; BUKAN Hold internal)
+  FINALISASI       // ekspor/penyelesaian akhir sebelum dikirim (opsional)
+  DELIVERY         // pengiriman ke klien (dipegang marketer)
+  HOLD             // ditahan (waktu tidak dihitung)
+  SELESAI          // done / delivery
+  PREVIEW          // LEGACY (prototipe awal) — dibaca sebagai PREVIEW_KLIEN
+  REVISI           // LEGACY (prototipe awal) — dibaca sebagai REVISI_KLIEN
+}
+
+model TahapProduksi {
+  id        String          @id @default(cuid())
+  keahlian  KeahlianTahap[]
+  penugasan PenugasanTahap[]
+  studioId  String
+  studio    Studio          @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  urutan    Int
+  nama      String
+  jenis     JenisTahap
+  indukId   String? // untuk QC / REVISI_INTERNAL: id tahap KERJA yang dijaganya; null = gerbang umum
+  opsional  Boolean         @default(false) // boleh dinyalakan/dimatikan per order
+  aktifBawaan Boolean       @default(true) // bila opsional: menyala secara bawaan di order baru
+  createdAt DateTime        @default(now())
+  orders    OrderProduksi[]
+
+  @@unique([studioId, nama])
+  @@index([studioId, urutan])
+}
+
+model RiwayatTahapOrder {
+  id           String        @id @default(cuid())
+  orderId      String
+  order        OrderProduksi @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  namaTahap    String
+  jenis        JenisTahap
+  userId       String? // siapa yang memindahkan (tanpa FK: riwayat tetap utuh walau akun dihapus)
+  namaPengguna String?
+  mulai        DateTime      @default(now())
+  selesai      DateTime?
+
+  @@index([orderId, mulai])
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// FUNGSI KERJA ANGGOTA (21 Okt 2026) — siapa artist / marketer / PM-QC / admin di SATU studio.
+// Terpisah dari peran jenjang (Koordinator/Kader/...) dan dari teks bebas User.posisi. Acuan OGS: peran fungsi
+// (ilustrator/produser, marketer, project manager, admin) per pengguna. Boleh lebih dari satu per orang.
+// Diisi dari TEBAKAN atas posisi (terkonfirmasi=false), lalu dikonfirmasi koordinator (terkonfirmasi=true).
+// ══════════════════════════════════════════════════════════════════════════
+enum FungsiKerja {
+  ARTIST   // pembuat karya (3D, rigging, animasi, ilustrasi, GFS, desain)
+  MARKETER // klien, chat, preview/delivery ke klien, aktivitas pemasaran
+  PM_QC    // koordinasi, penugasan, QC
+  ADMIN    // administrasi (keuangan/operasional) — bukan pemasaran
+}
+
+model FungsiAnggota {
+  id               String      @id @default(cuid())
+  userId           String
+  user             User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studioId         String
+  studio           Studio      @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  fungsi           FungsiKerja
+  bidang           String? // untuk ARTIST: 3D, Rigging, Animasi, Ilustrasi, GFS, Desain
+  terkonfirmasi    Boolean     @default(false)
+  dikonfirmasiOleh String?
+  dikonfirmasiPada DateTime?
+  createdAt        DateTime    @default(now())
+
+  @@unique([userId, studioId, fungsi])
+  @@index([studioId, fungsi])
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// MARKETING (20 Okt 2026) — adaptasi marketing OGS (tugas harian, rencana bulanan, profil, log) di atas entitas Ekosistem:
+// akun marketplace = AkunProduksi, prospek = MarketingLead, chat/brief/preview/delivery = tahap alur order (bukan tugas harian,
+// sama dengan arah OGS sejak 5 Agt 2026). TIDAK menyentuh keuangan / omset / Weekly Report.
+// ══════════════════════════════════════════════════════════════════════════
+model PenugasanAkunMarketer {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  akunId    String
+  akun      AkunProduksi @relation(fields: [akunId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
+
+  @@unique([userId, akunId])
+}
+
+model AktivitasMarketer {
+  id         String        @id @default(cuid())
+  userId     String // pelaksana
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studioId   String
+  studio     Studio        @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  tanggal    DateTime      @db.Date
+  jenis      String // kunci katalog: publish_post, engage_reply, optimize_seo, ...
+  akunId     String?
+  akun       AkunProduksi? @relation(fields: [akunId], references: [id], onDelete: SetNull)
+  judul      String?
+  platform   String?
+  jamPosting String? // "HH:MM"
+  link       String?
+  targetAkun String? // akun yang dikomen/di-DM
+  pengikut   Int? // follower akun target
+  hasil      String?
+  jumlah     Int           @default(1)
+  selesai    Boolean       @default(false)
+  selesaiPada DateTime?
+  catatan    String?
+  dibuatOleh String? // userId yang menugaskan/mengisi
+  createdAt  DateTime      @default(now())
+
+  @@index([userId, tanggal])
+  @@index([studioId, tanggal])
+  @@index([akunId, tanggal])
+}
+
+model TargetMarketing {
+  id      String       @id @default(cuid())
+  userId  String
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  akunId  String
+  akun    AkunProduksi @relation(fields: [akunId], references: [id], onDelete: Cascade)
+  bulan   Int
+  tahun   Int
+  post    Int          @default(0)
+  reply   Int          @default(0)
+  update  Int          @default(0)
+  seo     Int          @default(0)
+  updatedAt DateTime   @updatedAt
+
+  @@unique([userId, akunId, bulan, tahun])
+}
+
+model ProfilSosialMarketer {
+  id       String   @id @default(cuid())
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform String
+  link     String
+  label    String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model LogHarianMarketer {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tanggal   DateTime @db.Date
+  mood      String // semangat, bahagia, gembira, biasa, capek, sedih, stress, marah
+  catatan   String?
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, tanggal])
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// KALENDER KERJA (20 Okt 2026) — hari libur global untuk menghitung JAM KERJA BERSIH di analitik web circle
+// (acuan OGS WorkCalendarService/BusinessHoursCalculator). Jadwal: Senin–Jumat 09–17, Sabtu 09–16, minus istirahat,
+// Minggu = 0. Hanya hari libur yang disimpan; diatur Super Admin.
+// ══════════════════════════════════════════════════════════════════════════
+model HariLiburKerja {
+  id        String   @id @default(cuid())
+  tanggal   DateTime @unique @db.Date
+  nama      String
+  jenis     String   @default("LIBUR") // LIBUR | WFA | LAINNYA (hanya LIBUR yang menghilangkan jam kerja)
+  catatan   String?
+  createdAt DateTime @default(now())
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// DETAIL ORDER web circle (20 Okt 2026) — adaptasi OGS TransactionItem / TransactionPaymentMilestone / ProjectNote.
+// BAYANGAN: tidak menulis ke WeeklyReport. Termin hanya menyelaraskan status bayar order (statusBayar/dpAmount/tanggalLunas),
+// yang sudah milik modul Produksi. Semua uang dalam Rupiah (sama seperti OrderProduksi.nilaiKotor/nilaiBersih).
+// ══════════════════════════════════════════════════════════════════════════
+model ItemOrder {
+  id          String        @id @default(cuid())
+  orderId     String
+  order       OrderProduksi @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  jenis       String        @default("ITEM") // ITEM | ADDON
+  nama        String
+  jumlah      Int           @default(1)
+  hargaSatuan Float         @default(0)
+  urutan      Int           @default(0)
+  catatan     String?
+  createdAt   DateTime      @default(now())
+
+  @@index([orderId, urutan])
+}
+
+model TerminBayarOrder {
+  id          String        @id @default(cuid())
+  orderId     String
+  order       OrderProduksi @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  label       String // DP, Termin 1, Pelunasan, ...
+  jumlah      Float
+  jatuhTempo  DateTime?     @db.Date
+  dibayarPada DateTime?     @db.Date // terisi = sudah diterima
+  catatan     String?
+  tagihanId   String? // dibuat otomatis saat invoice (TagihanKomunitas) ditandai Lunas (12 Nov 2026)
+  urutan      Int           @default(0)
+  createdAt   DateTime      @default(now())
+
+  @@index([orderId, urutan])
+  @@index([dibayarPada, jatuhTempo])
+}
+
+model CatatanOrder {
+  id        String        @id @default(cuid())
+  orderId   String
+  order     OrderProduksi @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  userId    String? // tanpa FK: catatan tetap utuh walau akun dihapus
+  nama      String
+  isi       String
+  createdAt DateTime      @default(now())
+
+  @@index([orderId, createdAt])
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// BIAYA, PENDAPATAN & KAS (20 Okt 2026) — adaptasi OGS (Expense, IncomeWithdrawal/Transfer/Held, CashAccount/Movement +
+// rekonsiliasi). MODE BAYANGAN: terpisah dari WeeklyReport & tabel Pengeluaran Ekosistem (tidak menulis ke laporan omset).
+// Uang dalam Rupiah. Nomor rekening LENGKAP tidak disimpan — hanya 4 digit akhir. Tanpa unggahan: hanya tautan.
+// ══════════════════════════════════════════════════════════════════════════
+model KategoriBiaya {
+  id        String   @id @default(cuid())
+  nama      String   @unique
+  kategoriLedgerId String? // pemetaan ke kategori buku besar (OGS expense_categories.finance_v2_category_id)
+  khususManajemen Boolean @default(false)
+  aktif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model BiayaStudio {
+  id           String    @id @default(cuid())
+  studioId     String?
+  studio       Studio?   @relation(fields: [studioId], references: [id], onDelete: SetNull)
+  kategori     String
+  tanggal      DateTime  @db.Date
+  jatuhTempo   DateTime? @db.Date
+  jumlah       Float
+  jumlahDibayar Float?
+  deskripsi    String?
+  freelancer   String?
+  tipe         String? // mis. TETAP | VARIABEL
+  statusBayar  String    @default("BELUM") // BELUM | SEBAGIAN | LUNAS
+  persetujuan  String    @default("MENUNGGU") // MENUNGGU | DISETUJUI | DITOLAK
+  dibayarPada  DateTime?
+  dibayarOleh  String?
+  dibuatOlehId String?
+  dibuatOleh   String?
+  linkInvoice  String?
+  linkDrive    String?
+  terkunci     Boolean   @default(false)
+  rekeningId   String? // StudioRekening (Bio Ekosistem) — dibayar dari rekening mana (12 Nov 2026)
+  assignmentId String? // dibuat otomatis dari "Bayar freelance" (AssignmentProduksi, 12 Nov 2026) — dihapus bila pembayaran dibatalkan
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([assignmentId])
+  @@index([studioId, tanggal])
+  @@index([statusBayar, persetujuan])
+}
+
+model PenarikanPendapatan {
+  id          String   @id @default(cuid())
+  nomor       String   @unique // WD-YYYYMM-0001
+  studioId    String
+  studio      Studio   @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  akunId      String?
+  tanggal     DateTime @db.Date
+  jumlah      Float
+  dariPlatform String // paypal | vgen | fiverr | etsy | upwork | lainnya
+  bankTujuan  String
+  atasNama    String
+  rekeningId  String? // StudioRekening (Bio Ekosistem) — masuk ke rekening mana (12 Nov 2026)
+  catatan     String?
+  bulan       String // YYYY-MM
+  status      String   @default("MENUNGGU") // MENUNGGU | SELESAI
+  dibuatOleh  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  transfer    TransferPendapatan[]
+  tertahan    PendapatanTertahan[]
+
+  @@index([studioId, bulan])
+}
+
+model TransferPendapatan {
+  id            String   @id @default(cuid())
+  penarikanId   String
+  penarikan     PenarikanPendapatan @relation(fields: [penarikanId], references: [id], onDelete: Cascade)
+  studioId      String
+  tanggal       DateTime @db.Date
+  jumlah        Float // boleh beda dari penarikan (dipotong biaya)
+  dariBank      String
+  dariAtasNama  String
+  keRekening    String   @default("Kas pusat")
+  catatan       String?
+  bulan         String
+  status        String   @default("MENUNGGU") // MENUNGGU | DITRANSFER | DIKONFIRMASI
+  dibuatOleh    String?
+  ditransferOleh String?
+  ditransferPada DateTime?
+  dikonfirmasiOleh String?
+  dikonfirmasiPada DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  tertahan      PendapatanTertahan[]
+
+  @@index([studioId, bulan])
+  @@index([status])
+}
+
+model PendapatanTertahan {
+  id          String   @id @default(cuid())
+  nomor       String   @unique // HD-YYYYMM-0001
+  penarikanId String?
+  penarikan   PenarikanPendapatan? @relation(fields: [penarikanId], references: [id], onDelete: SetNull)
+  studioId    String
+  akunId      String?
+  tanggal     DateTime @db.Date
+  jumlah      Float
+  bank        String
+  atasNama    String
+  dariPlatform String  @default("lainnya")
+  catatan     String?
+  linkDrive   String?
+  bulan       String
+  status      String   @default("TERTAHAN") // TERTAHAN | DILEPAS
+  transferId  String?
+  transfer    TransferPendapatan? @relation(fields: [transferId], references: [id], onDelete: SetNull)
+  dibuatOleh  String?
+  dilepasOleh String?
+  dilepasPada DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([studioId, bulan])
+  @@index([status])
+}
+
+model DompetKas {
+  id          String   @id @default(cuid())
+  kode        String   @unique
+  nama        String
+  tipe        String   // BANK | EWALLET
+  pemegang    String?
+  akhiran     String?  // 4 digit terakhir — nomor lengkap TIDAK disimpan
+  mataUang    String   @default("IDR")
+  aktif       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  mutasi      MutasiKas[]
+  mutasiLawan MutasiKas[] @relation("MutasiLawan")
+}
+
+model MutasiKas {
+  id          String   @id @default(cuid())
+  dompetId    String
+  dompet      DompetKas @relation(fields: [dompetId], references: [id], onDelete: Cascade)
+  dompetLawanId String?
+  dompetLawan DompetKas? @relation("MutasiLawan", fields: [dompetLawanId], references: [id], onDelete: SetNull)
+  kunciImpor  String   @unique
+  bulan       String
+  tanggal     DateTime? @db.Date
+  tipe        String   // OPENING | DEPOSIT | WITHDRAWAL | INTERNAL | EXPENSE | INCOME | ADJUSTMENT | OTHER
+  arah        String   // CR | DB
+  jumlah      Float
+  kategori    String?
+  subkategori String?
+  deskripsi   String?
+  internal    Boolean  @default(false)
+  mempengaruhiPl Boolean @default(true)
+  rekonStatus String   @default("BELUM") // BELUM | COCOK | ABAIKAN
+  cocokTipe   String?  // TRANSFER | BIAYA
+  cocokId     String?
+  catatanRekon String?
+  direkonPada DateTime?
+  direkonOleh String?
+  createdAt   DateTime @default(now())
+
+  @@index([dompetId, bulan])
+  @@index([bulan, rekonStatus])
+  @@index([cocokTipe, cocokId])
+}
+
+model SaldoPlatformBulanan {
+  id        String   @id @default(cuid())
+  studioId  String
+  bulan     String
+  platform  String
+  jumlah    Float    @default(0)
+  dibuatOleh String?
+  updatedAt DateTime @updatedAt
+
+  @@unique([studioId, bulan, platform])
+}
+
+model SaldoBankBulanan {
+  id          String   @id @default(cuid())
+  bulan       String
+  namaRekening String
+  jumlah      Float    @default(0)
+  dibuatOleh  String?
+  updatedAt   DateTime @updatedAt
+
+  @@unique([bulan, namaRekening])
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// BUKU BESAR & TUTUP BULAN (20 Okt 2026) — adaptasi OGS Finance V2/V4 (Category, FixedItem(+Override), LedgerEntry, MonthStatus,
+// ClosingLedgerSyncService, TutupBulanService, RingkasanService). MODE BAYANGAN: kas akhir & status bulan disimpan di sini,
+// BUKAN di WeeklyReport / StudioMonthlyNote Ekosistem. Transfer yang dikirim/dikonfirmasi + biaya DISETUJUI → ledger; item tetap
+// ditambahkan saat tutup bulan; semua dikunci. Uang dalam Rupiah.
+// ══════════════════════════════════════════════════════════════════════════
+model KategoriLedger {
+  id        String   @id @default(cuid())
+  studioId  String?
+  nama      String
+  arus      String   // INCOME | EXPENSE
+  sifat     String?  // TETAP | VARIABEL (null untuk INCOME)
+  urutan    Int      @default(0)
+  aktif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  item      ItemTetap[]
+  entri     EntriLedger[]
+
+  @@index([arus, urutan])
+}
+
+model ItemTetap {
+  id          String   @id @default(cuid())
+  kategoriId  String
+  kategori    KategoriLedger @relation(fields: [kategoriId], references: [id], onDelete: Cascade)
+  studioId    String? // null = berlaku untuk semua unit
+  userId      String?
+  nama        String
+  jumlahBawaan Float   @default(0)
+  urutan      Int      @default(0)
+  rekeningId  String? // dibayar dari rekening mana (hanya item milik unit; 12 Nov 2026)
+  aktif       Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  bulanan     ItemTetapBulan[]
+
+  @@index([studioId, aktif])
+}
+
+model ItemTetapBulan {
+  id        String    @id @default(cuid())
+  itemId    String
+  item      ItemTetap @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  bulan     String
+  jumlah    Float     @default(0)
+  catatan   String?
+  diubahOleh String?
+  updatedAt DateTime  @updatedAt
+
+  @@unique([itemId, bulan])
+}
+
+model EntriLedger {
+  id         String   @id @default(cuid())
+  studioId   String
+  kategoriId String
+  kategori   KategoriLedger @relation(fields: [kategoriId], references: [id], onDelete: Cascade)
+  tanggal    DateTime @db.Date
+  deskripsi  String
+  jumlah     Float
+  sumberTipe String   @default("MANUAL") // MANUAL | TRANSFER | BIAYA | ITEM_TETAP
+  sumberId   String?
+  rekeningId String? // StudioRekening (Bio Ekosistem); snapshot tutup bulan ikut menyalin (12 Nov 2026)
+  bulan      String
+  terkunci   Boolean  @default(false)
+  dibuatOleh String?
+  createdAt  DateTime @default(now())
+
+  @@index([studioId, bulan])
+  @@index([sumberTipe, sumberId])
+}
+
+// Pindah dana antar rekening unit (tarik tunai, pindah bank) — tidak mengubah total kas, hanya saldo per rekening (12 Nov 2026).
+// Rekening = StudioRekening (Bio studio Ekosistem). MODE BAYANGAN: tidak menulis saldo ke StudioRekening.
+model PindahRekening {
+  id         String   @id @default(cuid())
+  studioId   String
+  tanggal    DateTime @db.Date
+  bulan      String
+  dariId     String
+  keId       String
+  jumlah     Float
+  catatan    String?
+  dibuatOleh String?
+  createdAt  DateTime @default(now())
+
+  @@index([studioId, bulan])
+}
+
+model StatusBulan {
+  id          String   @id @default(cuid())
+  studioId    String
+  bulan       String
+  status      String   @default("BERJALAN") // BERJALAN | DITUTUP
+  kasAwalManual Float?  // kas awal bulan pertama (sebelum ada bulan ditutup sebelumnya)
+  kasAwal     Float?   // snapshot saat ditutup
+  masuk       Float?
+  variabel    Float?
+  tetap       Float?
+  kasAkhir    Float?
+  ditutupPada DateTime?
+  saldoAwalRekening Json? // { [rekeningId]: saldo } diisi koordinator (12 Nov 2026)
+  saldoRekening     Json? // snapshot saat ditutup: { awal: {...}, akhir: {...} }
+  bioDisamakanPada  DateTime? // tombol "Perbarui saldo Bio dari circle" (opsi 2, keputusan user 12 Nov 2026)
+  bioDisamakanOleh  String?
+  bioSebelum        Json?     // { [rekeningId]: saldo Bio sebelum disamakan } — jejak bila perlu dikembalikan
+  ditutupOleh String?
+  catatan     String?
+  updatedAt   DateTime @updatedAt
+
+  @@unique([studioId, bulan])
+  @@index([bulan, status])
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PENUGASAN PER TAHAP, KEAHLIAN & ANTREAN (20 Okt 2026) — adaptasi OGS TransactionItemAssignment (work_state, progress, queue_priority),
+// DesignerStageSkill, ProducerGenreSkill, AutoAssignService, ReassignmentSuggestionService. Baris dibuat otomatis saat order MASUK
+// tahap kerja (KERJA / REVISI) untuk orang yang ditugaskan di order; ditutup saat order meninggalkan tahap itu. Menajamkan analitik
+// kinerja per orang. Penugasan otomatis hanya bila diaktifkan per unit (PengaturanPenugasan).
+// ══════════════════════════════════════════════════════════════════════════
+model PenugasanTahap {
+  id           String        @id @default(cuid())
+  orderId      String
+  order        OrderProduksi @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  tahapId      String?
+  tahap        TahapProduksi? @relation(fields: [tahapId], references: [id], onDelete: SetNull)
+  namaTahap    String
+  jenisTahap   String
+  userId       String
+  status       String        @default("MENUNGGU") // MENUNGGU | DIKERJAKAN | SELESAI
+  progres      Int           @default(0)
+  catatanKerja String?
+  dijadwalkan  DateTime?     @db.Date
+  ditugaskanPada DateTime    @default(now())
+  mulaiPada    DateTime?
+  selesaiPada  DateTime?
+  urutanAntrean Int? // override koordinator; null = FIFO menurut ditugaskanPada
+  mendesak     Boolean       @default(false) // OGS queue_priority=0: selalu di atas antrean orangnya
+  tunda        Boolean       @default(false) // 12 Nov 2026 (masukan tim): admin menunda — tidak masuk Antreanku talent hari ini (tetap di Tugasku: prioritas berikutnya / lembur)
+  ditugaskanOleh String?
+  otomatis     Boolean       @default(false)
+
+  @@index([userId, status])
+  @@index([orderId, tahapId])
+}
+
+model KeahlianTahap {
+  id           String   @id @default(cuid())
+  studioId     String
+  userId       String
+  tahapId      String
+  tahap        TahapProduksi @relation(fields: [tahapId], references: [id], onDelete: Cascade)
+  akunId       String? // null = semua akun
+  maksKesulitan String  @default("MUDAH") // MUDAH | SEDANG | SULIT
+  createdAt    DateTime @default(now())
+
+  @@index([studioId, tahapId])
+  @@index([userId])
+}
+
+model KeahlianGenre {
+  id           String   @id @default(cuid())
+  studioId     String
+  userId       String
+  genre        String
+  maksKesulitan String  @default("MUDAH")
+  createdAt    DateTime @default(now())
+
+  @@unique([studioId, userId, genre])
+}
+
+model PengaturanPenugasan {
+  studioId  String   @id
+  otomatis  Boolean  @default(false)
+  alurDisetujui Boolean @default(false) // koordinator sudah memeriksa alur kerja ('Mulai di sini' langkah 3) — tersimpan di server, bukan di peramban
+  qcSemua   Boolean  @default(false) // 12 Nov 2026 (masukan tim): semua hasil talent (Pengerjaan, Revisi klien, Finalisasi) dicek admin di QC dulu
+  updatedAt DateTime @updatedAt
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// DISKUSI KEPUTUSAN & OTOMATISASI (20 Okt 2026) — adaptasi OGS DecisionThread/Participant/Message/Mention + AutomationRun
+// (DeadlineUnassignedService, StuckQcEscalationService). TANPA lampiran berkas: hanya tautan. Pesan otomatis ditulis oleh "Otomasi".
+// ══════════════════════════════════════════════════════════════════════════
+model DiskusiKeputusan {
+  id          String   @id @default(cuid())
+  studioId    String
+  orderId     String? // subjek (opsional)
+  judul       String
+  deskripsi   String?
+  tautan      String[] @default([])
+  status      String   @default("TERBUKA") // TERBUKA | DIPUTUSKAN | DIBATALKAN
+  dibuatOlehId String? // null = Otomasi
+  dibuatOleh  String
+  otomatis    Boolean  @default(false)
+  diputuskanOleh String?
+  diputuskanPada DateTime?
+  ringkasanKeputusan String?
+  dibatalkanOleh String?
+  dibatalkanPada DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  peserta     PesertaDiskusi[]
+  pesan       PesanDiskusi[]
+
+  @@index([studioId, status])
+  @@index([orderId])
+}
+
+model PesertaDiskusi {
+  id          String   @id @default(cuid())
+  diskusiId   String
+  diskusi     DiskusiKeputusan @relation(fields: [diskusiId], references: [id], onDelete: Cascade)
+  userId      String
+  peran       String   @default("PESERTA") // PEMILIK | PESERTA
+  terakhirDibaca DateTime?
+  createdAt   DateTime @default(now())
+
+  @@unique([diskusiId, userId])
+  @@index([userId])
+}
+
+model PesanDiskusi {
+  id          String   @id @default(cuid())
+  diskusiId   String
+  diskusi     DiskusiKeputusan @relation(fields: [diskusiId], references: [id], onDelete: Cascade)
+  userId      String? // null = Otomasi
+  nama        String
+  indukId     String?
+  isi         String
+  tautan      String[] @default([])
+  sebut       String[] @default([]) // userId yang disebut
+  dihapusPada DateTime?
+  createdAt   DateTime @default(now())
+
+  @@index([diskusiId, createdAt])
+}
+
+model LogOtomasi {
+  id          String   @id @default(cuid())
+  aturan      String
+  subjekTipe  String?
+  subjekId    String?
+  kunciDedup  String
+  aksi        String
+  payload     Json?
+  createdAt   DateTime @default(now())
+
+  @@unique([aturan, kunciDedup])
+  @@index([aturan, subjekTipe, subjekId])
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// SKOR EKSEKUTIF & KAIZEN (20 Okt 2026) — adaptasi OGS StudioWeeklyTarget/AccountMonthlyTarget (niat omset), ExecutiveScorecardService,
+// KaizenAnalyticsService, KaizenAction. Target omset dalam USD (sama seperti WeeklyReport.totalUsd). MODE BAYANGAN untuk keuangan.
+// ══════════════════════════════════════════════════════════════════════════
+model TargetOmsetUnit {
+  id        String   @id @default(cuid())
+  studioId  String
+  tahun     Int
+  bulan     Int
+  targetUsd Float
+  diubahOleh String?
+  updatedAt DateTime @updatedAt
+
+  @@unique([studioId, tahun, bulan])
+}
+
+model TargetOmsetAkun {
+  id        String   @id @default(cuid())
+  akunId    String
+  tahun     Int
+  bulan     Int
+  targetUsd Float
+  diubahOleh String?
+  updatedAt DateTime @updatedAt
+
+  @@unique([akunId, tahun, bulan])
+}
+
+model KaizenTindakan {
+  id          String   @id @default(cuid())
+  lingkupJenis String  // circle | rumah-usaha
+  lingkupId   String
+  judul       String
+  deskripsi   String?
+  sumberTab   String?
+  snapshot    Json?
+  pemilikId   String?
+  dibuatOlehId String
+  dibuatOleh  String
+  jatuhTempo  DateTime? @db.Date
+  status      String   @default("BARU") // BARU | PROSES | SELESAI | BATAL
+  prioritas   String   @default("SEDANG") // RENDAH | SEDANG | TINGGI
+  selesaiPada DateTime?
+  catatanHasil String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([lingkupJenis, lingkupId, status])
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// KEHADIRAN (20 Okt 2026) — adaptasi OGS Attendance (AttendanceEvent/Leave/OvertimeEntry), DailyStateCheckIn, OgsCalendarEvent.
+// Data pribadi: presensi & cuti hanya dilihat orangnya + koordinator unitnya; CHECK-IN HARIAN bersifat PRIBADI (koordinator hanya
+// melihat siapa yang sudah mengisi + agregat, bukan emosi per orang). Jam kerja mengikuti utils/jamKerja.js (WIB).
+// ══════════════════════════════════════════════════════════════════════════
+model KehadiranEvent {
+  id            String   @id @default(cuid())
+  userId        String
+  tanggalKerja  DateTime @db.Date
+  jenis         String   // MASUK | PULANG | KELUAR | KEMBALI
+  jenisKeluar   String?  // ISTIRAHAT | SHOLAT | MEROKOK | KELUAR_STUDIO
+  modeKerja     String?  // WFO | WFA
+  lokasiWfa     String?  // RUMAH_KOS | CAFE | LAINNYA
+  dicatatPada   DateTime @default(now())
+  catatan       String?
+  // 16 Nov 2026 (masukan tim): unit tempat ia bekerja hari itu (dipilih saat MASUK) → jam kerja unit itu yang dipakai;
+  // otomatis = PULANG yang dibuat sistem (pulang otomatis unit), bukan ketukan orangnya
+  studioId      String?
+  otomatis      Boolean  @default(false)
+
+  @@index([userId, tanggalKerja])
+  @@index([tanggalKerja, jenis])
+}
+
+// JAM KERJA PER UNIT (16 Nov 2026, masukan timLangit): diatur Koordinator unit (CEO unit). Tanpa baris = jadwal bawaan
+// (utils/jamKerja.js JADWAL: Sen–Jum 09–17, Sab 09–16, istirahat 12–13, Jumat 11:30–13:30). jadwal = { "1": { kerja: ["08:30","16:30"],
+// istirahat: ["11:30","13:00"] } | null (libur), …, "6": … } — 1 = Senin … 6 = Sabtu; Minggu selalu libur.
+// pulangOtomatis: sesi tanpa presensi pulang ditutup sistem saat jam `batasPulang` (HH:MM) dengan waktu pulang = jam pulang resmi →
+// jam kerja terhitung, TIDAK menjadi lembur. Hanya sesi yang dimulai sejak `aktifSejak` (tidak mengubah riwayat lama).
+model JamKerjaUnit {
+  studioId       String    @id
+  jadwal         Json
+  pulangOtomatis Boolean   @default(false)
+  batasPulang    String?
+  aktifSejak     DateTime?
+  diubahOleh     String?
+  updatedAt      DateTime  @updatedAt
+}
+
+model CutiKehadiran {
+  id            String   @id @default(cuid())
+  userId        String
+  jenis         String   // SAKIT | IZIN | CUTI | DINAS_LUAR | LAINNYA
+  mulai         DateTime @db.Date
+  selesai       DateTime @db.Date
+  durasi        String   @default("SEHARI") // SEHARI | SETENGAH_PAGI | SETENGAH_SORE
+  alasan        String
+  status        String   @default("MENUNGGU") // MENUNGGU | DISETUJUI | DITOLAK | DIBATALKAN
+  ditinjauOlehId String?
+  ditinjauOleh  String?
+  ditinjauPada  DateTime?
+  catatanPeninjau String?
+  createdAt     DateTime @default(now())
+
+  @@index([userId, mulai, selesai])
+  @@index([status, mulai])
+}
+
+model LemburKehadiran {
+  id            String   @id @default(cuid())
+  userId        String
+  penggajianId  String?  // diklaim Payroll Ekosistem saat Generate (bila tarif lembur/jam unit diisi) — mencegah dihitung dua kali
+  penggajian    Penggajian? @relation(fields: [penggajianId], references: [id], onDelete: SetNull)
+  tanggalKerja  DateTime @db.Date
+  sumber        String   // OTOMATIS | MANUAL
+  mulai         DateTime
+  selesai       DateTime
+  menit         Int
+  catatan       String?
+  // 21 Okt 2026: unit tempat lembur (Payroll unit X hanya mengklaim lembur unit X) + persetujuan koordinator
+  studioId      String?
+  status        String   @default("DISETUJUI") // MENUNGGU | DISETUJUI | DITOLAK — hanya DISETUJUI yang dibayar
+  ditinjauOlehId String?
+  ditinjauOleh  String?
+  ditinjauPada  DateTime?
+  catatanPeninjau String?
+  // 9 Nov 2026 (mode lembur PER_PROYEK): order yang dilemburkan + nilai lembur yang diisi koordinator saat menyetujui
+  orderId       String?
+  nilaiProyek   Float?
+  // 9 Nov 2026 (mode PER_LEVEL, acuan hitung Sekai Land): level pekerjaan + progres awal–akhir (0–1); fee level DIKUNCI saat dicatat
+  levelId       String?
+  levelNama     String?
+  feeLevel      Float?
+  progresAwal   Float?
+  progresAkhir  Float?
+
+  @@index([userId, tanggalKerja])
+  @@index([studioId, status])
+}
+
+model CheckInHarian {
+  id            String   @id @default(cuid())
+  userId        String
+  tanggal       DateTime @db.Date
+  status        String   // DIISI | DILEWATI
+  emosi         String?
+  intensitas    Int?
+  kejernihan    Int?
+  fokusPikiran  String?
+  kebutuhan     String?
+  createdAt     DateTime @default(now())
+
+  @@unique([userId, tanggal])
+  @@index([tanggal, status])
+}
+
+model AcaraKalender {
+  id            String   @id @default(cuid())
+  lingkupJenis  String   // circle | rumah-usaha
+  lingkupId     String
+  judul         String
+  tanggal       DateTime @db.Date
+  seharian      Boolean  @default(false)
+  mulai         String?  // HH:MM
+  selesai       String?  // HH:MM
+  lokasi        String?
+  deskripsi     String?
+  berulang      String?  // MINGGUAN | BULANAN | TAHUNAN
+  berulangDihentikan DateTime? @db.Date
+  dibuatOlehId  String?
+  createdAt     DateTime @default(now())
+
+  @@index([lingkupJenis, lingkupId, tanggal])
+}
+
+// REFLEKSI MINGGUAN web circle (21 Okt 2026) — adaptasi OGS SdmReflection/SdmReflectionComment. Satu refleksi per orang per minggu (Senin WIB).
+model RefleksiMingguan {
+  id            String   @id @default(cuid())
+  userId        String
+  mingguMulai   DateTime @db.Date
+  kategori      String
+  tingkat       Int      // 1–5 (≥4 = perlu dukungan)
+  hambatan      String
+  komitmen      String?
+  perluDukungan Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  komentar      KomentarRefleksi[]
+
+  @@unique([userId, mingguMulai])
+  @@index([mingguMulai])
+}
+
+model KomentarRefleksi {
+  id          String   @id @default(cuid())
+  refleksiId  String
+  refleksi    RefleksiMingguan @relation(fields: [refleksiId], references: [id], onDelete: Cascade)
+  penulisId   String
+  penulis     String
+  isi         String
+  createdAt   DateTime @default(now())
+
+  @@index([refleksiId])
+}
+
+// LTK (Lempar-Terima Kerjaan) web circle (21 Okt 2026) — adaptasi OGS LtkCase, SISI STAF SAJA (tanpa portal pihak luar). TERIMA = pihak luar
+// membawa pekerjaan ke studio (kode PO-…), LEMPAR = studio melempar pekerjaan keluar (kode LMP-…). Negosiasi dicatat sebagai catatan.
+// DEAL + TERIMA → dikonversi jadi OrderProduksi (orderId).
+model KasusLtk {
+  id              String   @id @default(cuid())
+  kode            String   @unique
+  arah            String   // TERIMA | LEMPAR
+  status          String   @default("DRAFT") // DRAFT | DIAJUKAN | NEGOSIASI | DEAL | DITOLAK | DIBATALKAN
+  studioId        String
+  akunId          String?
+  namaPihak       String
+  jenisPihak      String   // KOMUNITAS | FREELANCE
+  kontak          String?
+  judul           String
+  kategori        String?
+  deskripsi       String?
+  anggaranCatatan String?
+  deadlineDiminta DateTime? @db.Date
+  tautanRujukan   String[] @default([])
+  hargaSepakat    Float?
+  deadlineSepakat DateTime? @db.Date
+  syarat          String?
+  tautanHasil     String?
+  pemasarId       String?
+  dibuatOlehId    String
+  orderId         String?
+  diajukanPada    DateTime?
+  dealPada        DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  catatan         CatatanLtk[]
+
+  @@index([studioId, status])
+  @@index([arah, status])
+}
+
+model CatatanLtk {
+  id        String   @id @default(cuid())
+  kasusId   String
+  kasus     KasusLtk @relation(fields: [kasusId], references: [id], onDelete: Cascade)
+  penulisId String
+  penulis   String
+  isi       String
+  createdAt DateTime @default(now())
+
+  @@index([kasusId])
+}
+
+// TAGIHAN KOMUNITAS web circle (21 Okt 2026) — adaptasi OGS CommunityInvoice, sisi staf. Menggabungkan beberapa order satu klien jadi satu tagihan.
+// Lunas → status bayar order terkait ikut LUNAS. Nilai = nilaiKotor order (Rp).
+model TagihanKomunitas {
+  id           String   @id @default(cuid())
+  nomor        String   @unique
+  studioId     String
+  klien        String
+  status       String   @default("DRAFT") // DRAFT | DITAGIH | LUNAS | BATAL
+  total        Float    @default(0)
+  catatan      String?
+  tautanBukti  String?
+  ditagihPada  DateTime?
+  lunasPada    DateTime?
+  dibuatOlehId String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  item         TagihanKomunitasItem[]
+
+  @@index([studioId, status])
+}
+
+model TagihanKomunitasItem {
+  id        String   @id @default(cuid())
+  tagihanId String
+  tagihan   TagihanKomunitas @relation(fields: [tagihanId], references: [id], onDelete: Cascade)
+  orderId   String
+  jumlah    Float
+  keterangan String? // DP | Pelunasan | teks lain — invoice per order dari detail order (12 Nov 2026); kosong = nilai penuh order (tagihan gabungan lama)
+  urutan    Int      @default(0)
+
+  @@index([tagihanId])
+  @@index([orderId])
+}
+
+// PENERBIT INVOICE per unit (9 Nov 2026, keputusan user): diisi SENDIRI oleh koordinator di web circle — teks yang memang untuk dibagikan ke
+// klien (nama penerbit, rekening penerima, catatan kaki). SENGAJA terpisah dari StudioRekening Ekosistem: rekening Ekosistem tetap tidak dikirim ke web circle.
+model PengaturanInvoice {
+  id          String   @id @default(cuid())
+  studioId    String   @unique
+  namaPenerbit String?  // kosong = nama studio
+  rekening    String?  // teks bebas, mis. "BCA 1234567890 a.n. Studio X"
+  catatanKaki String?
+  diubahOleh  String?
+  updatedAt   DateTime @updatedAt
+}
+
+// CHECKLIST SETORAN MARKETER web circle (21 Okt 2026) — adaptasi OGS finance_v2_marketer_checklists: tiap tanggal 11 & 24 tiap marketer × unit
+// mendapat satu checklist "sudah setor pemasukan". Dibuat otomatis saat dibuka (tanpa cron). Boleh ditautkan ke TransferPendapatan.
+model ChecklistSetor {
+  id          String   @id @default(cuid())
+  studioId    String
+  marketerId  String
+  periode     DateTime @db.Date // tanggal 11 atau 24
+  status      String   @default("MENUNGGU") // MENUNGGU | SELESAI
+  transferId  String?
+  catatan     String?
+  selesaiPada DateTime?
+  createdAt   DateTime @default(now())
+
+  @@unique([studioId, marketerId, periode])
+  @@index([studioId, periode])
+}
+
+// RIWAYAT LOGIN (21 Okt 2026) — adaptasi OGS user_login_logs. Dicatat tiap login berhasil (Ekosistem maupun web circle). Tanpa kata sandi/token.
+model LogLogin {
+  id       String   @id @default(cuid())
+  userId   String
+  web      String   // 'app' atau slug circle
+  ip       String?
+  perangkat String?
+  waktu    DateTime @default(now())
+
+  @@index([userId, waktu])
+  @@index([waktu])
+}
+
+// AUDIT PERUBAHAN ORDER (21 Okt 2026) — adaptasi OGS TransactionAuditLog: siapa mengubah apa (nilai, deadline, klien, kurs, tautan…).
+// Perpindahan tahap tetap di RiwayatTahapOrder.
+model AuditOrder {
+  id       String   @id @default(cuid())
+  orderId  String
+  order    OrderProduksi @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  userId   String?
+  nama     String
+  aksi     String   // BUAT | UBAH | ITEM | TERMIN | TAUTAN | KONVERSI | LAINNYA
+  field    String?
+  dari     String?
+  ke       String?
+  waktu    DateTime @default(now())
+
+  @@index([orderId, waktu])
+}
+
+// PROFIL SDM web circle (21 Okt 2026) — adaptasi OGS SdmProfile (posisi sekarang/berikutnya). Satu baris per orang.
+model ProfilSdm {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  posisiSekarang String?
+  posisiBerikut String?
+  catatan       String?
+  diubahOlehId  String?
+  updatedAt     DateTime @updatedAt
+}
+
+// LOG IMPERSONASI (21 Okt 2026) — Super Admin "masuk sebagai" pengguna lain di web circle, untuk bantuan/uji. Selalu tercatat.
+model LogImpersonasi {
+  id        String   @id @default(cuid())
+  adminId   String
+  targetId  String
+  web       String
+  alasan    String?
+  waktu     DateTime @default(now())
+
+  @@index([adminId, waktu])
+  @@index([targetId, waktu])
+}
+
+// Tarif lembur per jam untuk lembur dari PRESENSI web circle (menit setelah jam kerja). Opsional per unit: kosong = lembur presensi hanya ditampilkan
+// sebagai acuan di Payroll, TIDAK menambah uang. (Lembur Payroll Ekosistem yang lama berbasis progres × rate card, tetap jalan terpisah.)
+// ATURAN LEMBUR PER UNIT (21 Okt 2026, keputusan user: aturan beda-beda tiap studio → koordinator unit menentukannya sendiri di web circle).
+// Dihitung per HARI (utils/lembur.js): menit hari itu < minimalMenit → 0; dibulatkan ke bawah per pembulatanMenit; mode PER_JAM (tarifPerJam) /
+// BERTINGKAT (tingkat: [{ sampaiJam|null, tarifPerJam }] per hari) / PER_HARI (tarifPerHari, sekali per hari lembur) / TIDAK_DIBAYAR;
+// hari libur × pengaliLibur; total jam sebulan dibatasi batasJamBulanan. Lembur MANUAL wajib disetujui koordinator bila perluPersetujuan.
+model PengaturanLembur {
+  studioId          String   @id
+  mode              String   @default("PER_JAM") // PER_JAM | BERTINGKAT | PER_HARI | PER_PROYEK | PER_LEVEL | TIDAK_DIBAYAR
+  tarifPerJam       Float?
+  tingkat           Json?    // BERTINGKAT: [{ sampaiJam: 2, tarifPerJam: 20000 }, { sampaiJam: null, tarifPerJam: 30000 }]
+  tarifPerHari      Float?
+  pengaliLibur      Float    @default(1)
+  minimalMenit      Int      @default(0)
+  pembulatanMenit   Int      @default(0) // 0 = tanpa pembulatan; 15/30/60 = dibulatkan ke bawah
+  batasJamBulanan   Float?
+  perluPersetujuan  Boolean  @default(true)  // lembur MANUAL menunggu persetujuan koordinator
+  otomatisPerluSetuju Boolean @default(false) // lembur OTOMATIS (pulang lewat jam kerja) juga menunggu persetujuan
+  catatan           String?
+  diubahOleh        String?
+  updatedAt         DateTime @updatedAt
+}
+
+// Foto CPM sebuah studio pada akhir bulan (4 Nov 2026): bulan yang sudah lewat tidak ikut berubah
+// kalau ada anggota resign/THP diubah sesudahnya. Bulan berjalan tetap dihitung langsung (utils/cpm.js).
+model StudioCpmBulanan {
+  id                    String   @id @default(cuid())
+  studioId              String
+  bulan                 Int
+  tahun                 Int
+  totalThp              Float    @default(0)
+  jumlahOrang           Int      @default(0)
+  totalPengeluaranRutin Float    @default(0)
+  totalShu              Float    @default(0)
+  totalCpm              Float    @default(0)
+  diubahOleh            String?
+  diubahPada            DateTime?
+  studio                Studio   @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  createdAt             DateTime @default(now())
+
+  @@unique([studioId, bulan, tahun])
+}
+
+// Daftar level lembur per unit (mode PER_LEVEL): fee per level pekerjaan (mis. Revisi Minor 30rb, Level 1 100rb).
+// Uang lembur = fee level × (progres akhir − progres awal). Sengaja terpisah dari RateCardLembur (Payroll Ekosistem) agar web circle mandiri.
+model LevelLembur {
+  id         String   @id @default(cuid())
+  studioId   String
+  nama       String
+  produk     String   @default("") // "" = berlaku untuk semua produk; diisi bila fee level beda per produk (mis. 3D Printing / 3D Game)
+  keterangan String?
+  fee        Float
+  aktif      Boolean  @default(true)
+  urutan     Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@unique([studioId, nama, produk])
+  @@index([studioId])
+}
+
+// Tahap pekerjaan unit (mode PER_LEVEL): nama tahap → persen progres yang tercapai di akhir tahap (mis. Blocking 20%, Finishing 100%).
+// Hanya pilihan cepat saat anggota mengisi progres; angka tetap boleh diketik.
+model TahapLembur {
+  id       String @id @default(cuid())
+  studioId String
+  nama     String
+  persen   Int
+  urutan   Int    @default(0)
+
+  @@unique([studioId, nama])
+  @@index([studioId])
+}
+
+// Pilihan kategori order/LTK per unit (10 Nov 2026, masukan tim): dipilih dari daftar agar tidak typo. Daftar yang ditampilkan =
+// ini + kategori yang sudah dipakai di order/LTK unit (utils/kategori.js).
+model KategoriOrder {
+  id        String   @id @default(cuid())
+  studioId  String
+  nama      String
+  createdAt DateTime @default(now())
+
+  @@unique([studioId, nama])
+  @@index([studioId])
+}
+
+// SETORAN MARKETER bebas waktu (10 Nov 2026, keputusan user): marketer mencatat SETIAP KALI menyetor pemasukan akun jualan ke kas studio —
+// kapan saja, tanpa periode tetap tanggal 11/24 (aturan OGS) dan tanpa checklist "belum setor" otomatis. Pengganti ChecklistSetor (tabel lama dibiarkan sebagai riwayat).
+model SetoranMarketer {
+  id         String   @id @default(cuid())
+  studioId   String
+  marketerId String
+  tanggal    DateTime @db.Date
+  jumlah     Float?   // opsional (Rp)
+  transferId String?  // opsional: transfer di Biaya & Kas → Pendapatan yang sama
+  catatan    String?
+  dicatatOleh String? // nama pencatat bila bukan marketernya sendiri (koordinator mencatatkan)
+  createdAt  DateTime @default(now())
+
+  @@index([studioId, tanggal])
+  @@index([marketerId, tanggal])
+}
+
+// UPDATE KLIEN (10 Nov 2026, permintaan tim/Sekai Land): jejak kapan admin/marketer terakhir mengabari klien — supaya tak ada klien yang terlewat
+// tanpa kabar ("ghosting"). jenis: PREVIEW | KATA (kabar singkat tanpa preview) | DELIVER = kontak ke klien; FEEDBACK_TALENT = masukan klien sudah
+// diteruskan ke talent (bukan kontak ke klien). `otomatis` = tercatat dari aksi papan (keluar dari Preview klien / Delivery).
+model UpdateKlien {
+  id          String   @id @default(cuid())
+  orderId     String
+  order       OrderProduksi @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  studioId    String
+  jenis       String
+  catatan     String?
+  otomatis    Boolean  @default(false)
+  dicatatOlehId String?
+  dicatatOleh String?
+  waktu       DateTime @default(now())
+
+  @@index([studioId, waktu])
+  @@index([orderId, waktu])
+}
+
+// RINCIAN GAJI TETAP (10 Nov 2026, web circle): THP di Bio studio = TOTAL; koordinator memecahnya jadi komponen (mis. Uang makan, Transport, BPJS).
+// Gaji pokok = THP Bio − Σ komponen tetap, jadi total tetap sama dengan THP di Bio. Dipakai ulang tiap bulan (tanpa input ulang).
+model RincianGajiTetap {
+  id       String @id @default(cuid())
+  studioId String
+  userId   String
+  nama     String
+  jumlah   Float
+  urutan   Int    @default(0)
+
+  @@index([studioId, userId])
+}
+
+// STATUS BAYAR BIAYA RUTIN per bulan (12 Nov 2026, masukan tim): baris rutin di buku besar (dari Bio: gaji/Dignity/SHU/langganan/iuran —
+// sumber BIO; atau item tetap circle — ITEM_TETAP) ditandai SUDAH DIBAYAR pada tanggal & dari rekening tertentu → memotong saldo rekening itu
+// pada tanggal bayar (bukan tgl 26 perkiraan). sumberId = id baris (mis. "gaji:<userId>", "shu", id StudioPengeluaranRutin, id ItemTetap).
+model BayarRutin {
+  id          String   @id @default(cuid())
+  studioId    String
+  bulan       String   // YYYY-MM
+  sumber      String   // BIO | ITEM_TETAP
+  sumberId    String
+  dibayarPada DateTime @db.Date
+  rekeningId  String?
+  oleh        String?
+  createdAt   DateTime @default(now())
+
+  @@unique([studioId, bulan, sumber, sumberId])
+}
+
+// KOLOM KHUSUS ORDER per studio (12 Nov 2026, masukan tim): kebutuhan khusus tiap project yang dirancang studio sendiri,
+// mis. "Boleh pakai AI?" (YA_TIDAK), "Gaya" (PILIHAN), "Catatan klien" (TEKS). Nilai per order di OrderProduksi.isianKhusus.
+// diKartu = tampil sebagai label di kartu papan & antrean talent.
+model KolomKhususOrder {
+  id        String   @id @default(cuid())
+  studioId  String
+  nama      String
+  tipe      String   // YA_TIDAK | PILIHAN | TEKS
+  pilihan   String[] @default([])
+  diKartu   Boolean  @default(true)
+  urutan    Int      @default(0)
+  aktif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([studioId, aktif])
+}

@@ -1,0 +1,1561 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* ── Tema Ekosistem (13 Okt 2026): gaya clean ala kariranak.com, aksen TOSKA, huruf Inter ──────
+     Dua mode: GELAP (bawaan :root) & TERANG ([data-theme="light"] di bawah). Mode dipasang di
+     <html data-theme> oleh skrip kecil di index.html (sebelum React jalan, biar gak kedip) dan
+     saklar "Mode gelap" di Sidebar. SEMUA warna komponen wajib lewat variabel di sini.
+     Toska #0FC1BD terlalu terang untuk teks putih (kontras 2,2:1) → teks di atas aksen pakai
+     --on-accent (toska gelap), dan aksen sebagai WARNA TEKS pakai --accent-light. */
+  color-scheme: dark;
+  --bg-primary:    #121416;
+  --bg-surface:    #181a1d;
+  --bg-card:       #1e2124;
+  --bg-card-hover: #24282c;
+  --bg-input:      #24282c;
+  --border:        rgba(255,255,255,0.08);
+  --border-hover:  rgba(255,255,255,0.16);
+
+  --text:          #e8eaed;
+  --text-secondary:#a9b0b9;
+  --text-muted:    #8b929b;
+
+  --accent:        #0fc1bd;
+  --accent-hover:  #3dd6d2;
+  --accent-glow:   rgba(15,193,189,0.25);
+  --accent-subtle: rgba(15,193,189,0.13);
+  --accent-light:  #3dd6d2;
+  --on-accent:     #08302f;
+
+  --cyan:          #22b8d6;
+  --cyan-subtle:   rgba(34,184,214,0.13);
+  --green:         #10b981;
+  --green-subtle:  rgba(16,185,129,0.13);
+  --amber:         #f59e0b;
+  --amber-subtle:  rgba(245,158,11,0.13);
+  --red:           #ef4444;
+  --red-subtle:    rgba(239,68,68,0.13);
+  --pink:          #ec4899;
+  --pink-subtle:   rgba(236,72,153,0.13);
+
+  /* Lapisan netral: efek hover/latar tipis, lintasan progress bar, tirai modal */
+  --hover-overlay:  rgba(255,255,255,0.05);
+  --hover-strong:   rgba(255,255,255,0.08);
+  --track:          rgba(255,255,255,0.08);
+  --backdrop:       rgba(0,0,0,0.6);
+
+  --sidebar-w: 256px;
+  --header-h:  64px;
+  --radius:    12px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+  --shadow:    0 4px 24px rgba(0,0,0,0.35);
+  --shadow-sm: 0 2px 10px rgba(0,0,0,0.25);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg-primary:    #f7f7f7;
+  --bg-surface:    #f1f2f3;
+  --bg-card:       #ffffff;
+  --bg-card-hover: #fafafa;
+  --bg-input:      #ffffff;
+  --border:        #e5e7ea;
+  --border-hover:  #cdd1d6;
+
+  --text:          #3c3c3c;
+  --text-secondary:#5b6168;
+  --text-muted:    #6b7280;
+
+  --accent:        #0fc1bd;
+  --accent-hover:  #0cadaa;
+  --accent-glow:   rgba(15,193,189,0.22);
+  --accent-subtle: rgba(15,193,189,0.12);
+  --accent-light:  #087f7c;
+  --on-accent:     #08302f;
+
+  --cyan:          #0e7fa0;
+  --cyan-subtle:   rgba(14,127,160,0.10);
+  --green:         #0e8a5f;
+  --green-subtle:  rgba(14,138,95,0.10);
+  --amber:         #b45f06;
+  --amber-subtle:  rgba(180,95,6,0.10);
+  --red:           #d23a3a;
+  --red-subtle:    rgba(210,58,58,0.09);
+  --pink:          #c0266e;
+  --pink-subtle:   rgba(192,38,110,0.09);
+
+  --hover-overlay:  rgba(0,0,0,0.035);
+  --hover-strong:   rgba(0,0,0,0.06);
+  --track:          #e9ebee;
+  --backdrop:       rgba(20,24,28,0.35);
+
+  --shadow:    0 4px 20px rgba(17,24,39,0.08);
+  --shadow-sm: 0 1px 6px rgba(17,24,39,0.06);
+}
+
+html, body, #root {
+  height: 100%;
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg-primary);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font-family: inherit; cursor: pointer; border: none; background: none; }
+a { color: inherit; text-decoration: none; }
+
+/* ─── SCROLLBAR ────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ─── LAYOUT ───────────────────────────────────────────── */
+.app { display: flex; height: 100vh; height: 100dvh; overflow: hidden; }
+
+.main-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.page-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 32px;
+}
+
+/* ─── SIDEBAR ──────────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  height: 100%;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-logo {
+  height: var(--header-h);
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.logo-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--on-accent);
+  flex-shrink: 0;
+  box-shadow: 0 0 16px var(--accent-glow);
+}
+
+.logo-text-group { line-height: 1.2; }
+.logo-name { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: 0.04em; }
+.logo-sub  { font-size: 10px; font-weight: 500; color: var(--text-muted); letter-spacing: 0.12em; text-transform: uppercase; }
+
+.sidebar-nav {
+  flex: 1;
+  padding: 20px 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-section {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 16px 8px 8px;
+}
+.nav-section:first-child { padding-top: 0; }
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.18s ease;
+  position: relative;
+  width: 100%;
+  text-align: left;
+}
+
+.nav-item:hover {
+  background: var(--hover-overlay);
+  color: var(--text);
+}
+
+.nav-item.active {
+  background: var(--accent-subtle);
+  color: var(--accent-light);
+}
+
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 20px;
+  background: var(--accent);
+  border-radius: 0 3px 3px 0;
+}
+
+.nav-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nav-icon svg { width: 18px; height: 18px; }
+
+.nav-badge {
+  margin-left: auto;
+  background: var(--red, #ef4444);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 99px;
+  min-width: 18px;
+  text-align: center;
+  animation: badgePop 0.3s cubic-bezier(0.16,1,0.3,1);
+}
+@keyframes badgePop {
+  from { transform: scale(0); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+.sidebar-footer {
+  padding: 16px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.user-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: var(--radius-sm);
+  transition: background 0.18s;
+  cursor: pointer;
+}
+.user-card:hover { background: var(--hover-overlay); }
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--accent), var(--pink));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.user-info { flex: 1; min-width: 0; }
+.user-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-role { font-size: 11px; color: var(--text-muted); }
+
+/* ─── TOPBAR ───────────────────────────────────────────── */
+.topbar {
+  height: var(--header-h);
+  display: flex;
+  align-items: center;
+  padding: 0 32px;
+  border-bottom: 1px solid var(--border);
+  gap: 16px;
+  flex-shrink: 0;
+  background: var(--bg-surface);
+}
+
+.topbar-title { font-size: 16px; font-weight: 700; color: var(--text); flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  transition: all 0.18s;
+  background: transparent;
+  position: relative;
+}
+.icon-btn:hover { background: var(--hover-overlay); color: var(--text); }
+.icon-btn svg { width: 18px; height: 18px; }
+
+.notif-dot {
+  position: absolute;
+  top: 6px; right: 6px;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--red);
+  border: 2px solid var(--bg-surface);
+}
+
+.topbar-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--accent), var(--pink));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* ─── CARDS ────────────────────────────────────────────── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+
+.card-sm { padding: 16px; }
+
+/* ─── STAT CARDS ───────────────────────────────────────── */
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  transition: all 0.22s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.stat-card.purple::after { background: linear-gradient(90deg, var(--accent), var(--accent-light)); }
+.stat-card.cyan::after   { background: var(--cyan); }
+.stat-card.green::after  { background: var(--green); }
+.stat-card.amber::after  { background: var(--amber); }
+.stat-card.red::after    { background: var(--red); }
+
+.stat-card:hover { border-color: var(--border-hover); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+
+.stat-icon {
+  width: 40px; height: 40px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.stat-icon svg { width: 20px; height: 20px; }
+
+.stat-icon.purple { background: var(--accent-subtle); color: var(--accent-light); }
+.stat-icon.cyan   { background: var(--cyan-subtle);   color: var(--cyan); }
+.stat-icon.green  { background: var(--green-subtle);  color: var(--green); }
+.stat-icon.amber  { background: var(--amber-subtle);  color: var(--amber); }
+.stat-icon.red    { background: var(--red-subtle);    color: var(--red); }
+
+.stat-label { font-size: 12px; color: var(--text-muted); font-weight: 500; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.06em; }
+.stat-value { font-size: 26px; font-weight: 800; color: var(--text); line-height: 1; margin-bottom: 8px; }
+.stat-trend { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; }
+.trend-up   { color: var(--green); }
+.trend-down { color: var(--red); }
+
+/* ─── SECTION GRIDS ────────────────────────────────────── */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+.grid-2-1 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 24px; }
+.grid-1-2 { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; margin-bottom: 24px; }
+
+/* ─── PAGE HEADER ──────────────────────────────────────── */
+.page-header { margin-bottom: 28px; }
+.page-header h1 { font-size: 24px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+.page-header p  { font-size: 14px; color: var(--text-secondary); }
+
+/* ─── CARD HEADER ──────────────────────────────────────── */
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.card-title  { font-size: 15px; font-weight: 700; color: var(--text); }
+.card-action { font-size: 12px; font-weight: 500; color: var(--accent-light); cursor: pointer; transition: opacity 0.18s; }
+.card-action:hover { opacity: 0.75; }
+
+/* ─── BAR CHART ────────────────────────────────────────── */
+.bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 140px;
+  padding: 0 4px;
+}
+
+.bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+}
+
+.bar-wrap {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.bar {
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  min-height: 4px;
+  transition: height 0.4s ease, opacity 0.18s;
+  cursor: pointer;
+  position: relative;
+}
+.bar:hover { opacity: 0.8; }
+.bar.accent  { background: var(--accent); }
+.bar.cyan    { background: var(--cyan); }
+.bar.current { background: linear-gradient(180deg, var(--accent-light), var(--accent)); box-shadow: 0 0 12px var(--accent-glow); }
+
+.bar-label { font-size: 10px; color: var(--text-muted); font-weight: 500; }
+
+.chart-legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 16px;
+}
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+.legend-dot  { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* ─── ACTIVITY FEED ────────────────────────────────────── */
+.activity-list { display: flex; flex-direction: column; }
+
+.activity-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+.activity-item:last-child { border-bottom: none; }
+
+.activity-dot {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.activity-body { flex: 1; }
+.activity-title { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 2px; }
+.activity-title strong { font-weight: 600; }
+.activity-time  { font-size: 11px; color: var(--text-muted); }
+
+/* ─── PROGRESS BAR ─────────────────────────────────────── */
+.progress-wrap { margin-bottom: 14px; }
+.progress-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.progress-label { font-size: 13px; color: var(--text-secondary); }
+.progress-val   { font-size: 13px; font-weight: 600; color: var(--text); }
+.progress-bar   { height: 6px; background: var(--track); border-radius: 99px; overflow: hidden; }
+.progress-fill  { height: 100%; border-radius: 99px; }
+
+/* ─── TABLE ────────────────────────────────────────────── */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+table { width: 100%; min-width: 520px; border-collapse: collapse; }
+thead th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+tbody td {
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+tbody tr:last-child td { border-bottom: none; }
+
+/* Kolom pertama (judul/identitas baris) dikunci saat tabel digeser horizontal di mobile —
+   supaya baris tetap bisa dikenali walau kolom lain di sebelah kanan sedang di-scroll.
+   :not([colspan]) — baris "belum ada data"/subtotal yang mereka satu sel penuh dikecualikan,
+   sel begitu tidak butuh dikunci dan colspan bikin hitungan kolom berikutnya jadi salah.
+   Berlaku buat tbody DAN tfoot (baris TOTAL) -- sebelumnya cuma tbody, jadi baris TOTAL di
+   tfoot (Dashboard.jsx) kolom pertamanya gak pernah kena position:sticky sama sekali (tetap
+   static, background transparan), bikin konten kolom lain yang scroll di baliknya nembus
+   kelihatan di sebelah kiri teks "TOTAL" pas tabel digeser horizontal -- root cause beda dari
+   fix .table-sticky-2 sebelumnya (itu cuma nambahin tfoot ke rule width/left KHUSUS
+   table-sticky-2, lupa rule DASAR position:sticky ini yang notabene dipakai SEMUA tabel gak
+   cuma yang table-sticky-2). Ditemukan 25 Juli 2026 lewat inspeksi DOM langsung (computed style
+   kolom pertama tfoot: position:static, background:transparent -- vs tbody yang benar sticky). */
+thead th:first-child,
+tbody td:first-child:not([colspan]),
+tfoot td:first-child:not([colspan]) {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--bg-card);
+  box-shadow: 2px 0 6px -2px rgba(0,0,0,0.35);
+  white-space: nowrap;
+}
+thead th:first-child { z-index: 2; }
+
+/* Tabel dengan kolom nomor urut (#) di depan kolom judul (mis. Ringkasan Unit, Detail per
+   Studio, Omset & Kas Studio) — 2 kolom pertama dikunci bareng, bukan cuma 1, karena angka #
+   saja tidak cukup buat mengenali barisnya pas kolom lain di sebelah kanan sedang digeser.
+   Berlaku buat tbody DAN tfoot (baris TOTAL) -- baris tambahan seperti tr.row-nostick (yang
+   sengaja pakai colSpan gabung 2 kolom pertama, mis. section header studio/project) dikecualikan
+   — colSpan di situ bikin hitungan nth-child kolom sesudahnya salah. Baris Subtotal/TOTAL
+   SENGAJA TIDAK pakai colSpan (dipecah jadi 2 <td> biasa di JSX) justru supaya kena rule sticky
+   ini juga — sebelumnya pakai colSpan+row-nostick, hasilnya baris itu scroll horizontal sebagai
+   satu unit utuh (gak ada yang dikunci) sementara baris data di atas/bawahnya kolom Nama-nya
+   diam, jadi kelihatan "nembus"/geser ke kiri dibanding baris lain pas discroll. */
+/* Lebar kolom pertama dibaca dari custom property --sticky-col1 (di-set inline di <table style>
+   kalau kolom pertama BUKAN lebar default -- mis. Koperasi.jsx pakai kolom chevron 24px, bukan
+   nomor urut). Default 44px kalau gak di-set. INI SATU-SATUNYA sumber kebenaran lebar kolom
+   pertama -- kalau ada <th>/<td> yang kasih inline `width` sendiri buat kolom pertama, itu HARUS
+   sama persis dengan --sticky-col1 (atau default 44px), soalnya inline style menang atas class
+   ini (spesifisitas CSS) dan bisa bikin header vs isi baris beda lebar diam-diam -- itu penyebab
+   nyata bug "teks nembus"/kolom kedua kelihatan geser pas discroll horizontal di mobile
+   (Dashboard.jsx, ditemukan & diperbaiki 25 Juli 2026). */
+table.table-sticky-2 thead th:first-child,
+table.table-sticky-2 tbody tr:not(.row-nostick) td:first-child:not([colspan]),
+table.table-sticky-2 tfoot tr:not(.row-nostick) td:first-child:not([colspan]) {
+  width: var(--sticky-col1, 44px);
+  box-shadow: none;
+}
+table.table-sticky-2 thead th:nth-child(2),
+table.table-sticky-2 tbody tr:not(.row-nostick) td:nth-child(2):not([colspan]),
+table.table-sticky-2 tfoot tr:not(.row-nostick) td:nth-child(2):not([colspan]) {
+  position: sticky;
+  left: var(--sticky-col1, 44px);
+  z-index: 1;
+  background: var(--bg-card);
+  box-shadow: 2px 0 6px -2px rgba(0,0,0,0.35);
+  white-space: nowrap;
+}
+
+tbody tr:hover td { background: var(--hover-overlay); }
+
+/* Tabel yang datanya berat (banyak kolom + teks panjang, mis. Riwayat & P/L Mingguan) —
+   di mobile diganti kartu bertumpuk per baris, bukan tabel yang harus digeser horizontal.
+   Render dua-duanya di JSX (.responsive-table + .responsive-cards), CSS yang pilih mana
+   yang tampil sesuai lebar layar. */
+.responsive-cards { display: none; }
+@media (max-width: 640px) {
+  .responsive-table { display: none; }
+  .responsive-cards { display: flex; flex-direction: column; gap: 10px; }
+}
+
+.data-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+}
+.data-card-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--border);
+}
+.data-card-row:last-of-type { border-bottom: none; }
+.data-card-label {
+  font-size: 11px; color: var(--text-muted); text-transform: uppercase;
+  letter-spacing: 0.04em; flex-shrink: 0;
+}
+/* min-width:0 supaya nilai panjang (mis. lencana "Kolaborasi · Mitra") boleh menyusut & membungkus,
+   bukan mendorong kartu melewati lebar layar. */
+.data-card-value { font-size: 13px; color: var(--text); text-align: right; min-width: 0; }
+.data-card-value .badge { white-space: normal; text-align: left; }
+
+/* List ringkas di HP (1 Nov 2026, components/common/ItemRingkas.jsx) -- satu kotak bergaris,
+   satu baris per item, detail dibuka dengan ketuk; menggantikan tumpukan .data-card. */
+@media (max-width: 640px) {
+  .responsive-cards.list-ringkas {
+    gap: 0;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+}
+.item-ringkas { border-bottom: 1px solid var(--border); }
+.item-ringkas:last-child { border-bottom: none; }
+.item-ringkas-baris {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 48px;
+  padding: 10px 12px; background: none; border: none; text-align: left;
+  color: var(--text); font: inherit; cursor: pointer;
+}
+div.item-ringkas-baris { cursor: default; }
+.item-ringkas-panah { font-size: 9px; color: var(--text-muted); flex-shrink: 0; transition: transform 0.15s; }
+.item-ringkas-titik { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.item-ringkas-teks { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.item-ringkas-judul {
+  font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.item-ringkas-sub {
+  font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.item-ringkas-nilai { font-size: 13px; font-weight: 700; text-align: right; flex-shrink: 0; white-space: nowrap; }
+.item-ringkas-detail { padding: 2px 12px 12px 29px; }
+
+/* Sepasang field (mis. Periode Awal + Periode Akhir) yang di desktop enak berdampingan,
+   tapi di layar sempit jadi berdempetan tanpa jarak (input date native lebih rewel soal
+   lebar minimum) — dipaksa tumpuk 1 kolom di bawah 480px. */
+.form-field-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+@media (max-width: 480px) {
+  .form-field-pair { grid-template-columns: 1fr; }
+}
+
+/* Panel "tambah baru" (mis. + Tambah Laporan Minggu Ini) yang nempel di bawah daftar riwayat —
+   dulu dikasih background var(--bg-surface) buat beda dari .card, tapi --bg-surface itu
+   LEBIH GELAP dari --bg-card yang jadi parent-nya — bukannya keliatan "naik ke permukaan",
+   malah keliatan kayak lubang dengan 2 garis transisi warna deket-deketan (card→panel jadi
+   gelap, input di dalamnya jadi terang lagi) yang keliatan "garis nyasar" pas di-zoom.
+   Sekarang cukup pakai divider + judul uppercase aja buat pemisah, tanpa background/border
+   sendiri — inherit background .card, cuma padding buat spacing. */
+.form-panel {
+  padding: 16px 0 0;
+}
+.form-panel-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+}
+
+/* ─── BADGES ───────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.badge.success { background: var(--green-subtle); color: var(--green); }
+.badge.warning { background: var(--amber-subtle); color: var(--amber); }
+.badge.danger  { background: var(--red-subtle);   color: var(--red); }
+.badge.info    { background: var(--cyan-subtle);   color: var(--cyan); }
+.badge.purple  { background: var(--accent-subtle); color: var(--accent-light); }
+
+/* ─── BUTTONS ──────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.18s;
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+}
+.btn-primary  { background: var(--accent); color: var(--on-accent); }
+.btn-primary:hover { background: var(--accent-hover); box-shadow: 0 0 16px var(--accent-glow); }
+.btn-ghost    { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+.btn-ghost:hover { background: var(--hover-overlay); color: var(--text); border-color: var(--border-hover); }
+.btn svg { width: 15px; height: 15px; }
+
+/* ─── KANBAN ───────────────────────────────────────────── */
+.kanban-board {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding-bottom: 16px;
+}
+
+/* Papan bergaya kolom generik (mis. pipeline Rekrutmen) — kolom sama lebar di desktop,
+   jadi baris scroll horizontal di mobile supaya tidak terjepit sempit. */
+.pipeline-board {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.pipeline-board > * { flex: 1 1 0; min-width: 0; }
+
+.kanban-column {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.kanban-col-header {
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.col-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.col-title { font-size: 13px; font-weight: 700; color: var(--text); flex: 1; }
+.col-count {
+  background: var(--hover-strong);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+
+.kanban-cards {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 120px;
+}
+
+.kanban-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  cursor: grab;
+  transition: all 0.2s;
+}
+.kanban-card:hover { border-color: var(--border-hover); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+.kanban-card.dragging { opacity: 0.4; }
+.kanban-card.drag-over { border-color: var(--accent); background: var(--accent-subtle); }
+
+.kanban-card-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 10px; line-height: 1.4; }
+
+.kanban-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.kanban-card-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.tag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.tag.high   { background: var(--red-subtle);   color: var(--red); }
+.tag.medium { background: var(--amber-subtle); color: var(--amber); }
+.tag.low    { background: var(--green-subtle); color: var(--green); }
+.tag.feature { background: var(--accent-subtle); color: var(--accent-light); }
+.tag.bug     { background: var(--red-subtle);    color: var(--red); }
+.tag.docs    { background: var(--cyan-subtle);   color: var(--cyan); }
+
+.assignee-stack { display: flex; }
+.assignee-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 2px solid var(--bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: #fff;
+  margin-left: -6px;
+}
+.assignee-avatar:first-child { margin-left: 0; }
+
+.kanban-add {
+  width: 100%;
+  padding: 10px 12px;
+  margin: 8px 12px 12px;
+  width: calc(100% - 24px);
+  border-radius: var(--radius-sm);
+  border: 1px dashed var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.18s;
+  cursor: pointer;
+}
+.kanban-add:hover { border-color: var(--accent); color: var(--accent-light); background: var(--accent-subtle); }
+
+.drop-zone {
+  min-height: 80px;
+  border-radius: var(--radius-sm);
+  border: 2px dashed transparent;
+  transition: all 0.2s;
+}
+.drop-zone.over { border-color: var(--accent); background: var(--accent-subtle); }
+
+/* ─── MEMBERS ──────────────────────────────────────────── */
+.member-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.member-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  transition: all 0.22s;
+  cursor: pointer;
+}
+.member-card:hover { border-color: var(--border-hover); transform: translateY(-3px); box-shadow: var(--shadow-sm); }
+
+.member-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.member-name { font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.4; }
+.member-role { font-size: 12px; color: var(--text-muted); margin-top: 2px; line-height: 1.4; }
+.member-dept { font-size: 11px; font-weight: 500; color: var(--text-secondary); padding: 3px 10px; background: var(--hover-strong); border-radius: 99px; }
+
+.member-stats {
+  display: flex;
+  gap: 16px;
+  margin-top: 4px;
+}
+.member-stat { text-align: center; }
+.member-stat-val { font-size: 16px; font-weight: 700; color: var(--text); }
+.member-stat-key { font-size: 10px; color: var(--text-muted); font-weight: 500; }
+
+/* ─── SEARCH ───────────────────────────────────────────── */
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px 14px;
+  color: var(--text-secondary);
+  transition: border-color 0.18s;
+  margin-bottom: 20px;
+}
+.search-bar:focus-within { border-color: var(--accent); }
+.search-bar svg { width: 16px; height: 16px; flex-shrink: 0; }
+.search-bar input {
+  background: none;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  width: 100%;
+}
+.search-bar input::placeholder { color: var(--text-muted); }
+
+/* ─── FINANCE BALANCE CARD ─────────────────────────────── */
+.balance-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 28px;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.balance-card::before {
+  content: '';
+  position: absolute;
+  top: -60px; right: -60px;
+  width: 240px; height: 240px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--accent-subtle), transparent 70%);
+  pointer-events: none;
+}
+.balance-card::after {
+  content: '';
+  position: absolute;
+  bottom: -80px; left: 40%;
+  width: 200px; height: 200px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--cyan-subtle), transparent 70%);
+  pointer-events: none;
+}
+
+.balance-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 8px; }
+.balance-amount { font-size: 42px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+.balance-sub    { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
+
+.balance-metrics { display: flex; gap: 32px; }
+.balance-metric-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.08em; }
+.balance-metric-val   { font-size: 16px; font-weight: 700; color: var(--text); }
+.balance-metric-val.up   { color: var(--green); }
+.balance-metric-val.down { color: var(--red); }
+
+/* ─── TRANSACTION LIST ─────────────────────────────────── */
+.txn-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.txn-item:last-child { border-bottom: none; }
+
+.txn-icon {
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.txn-info { flex: 1; }
+.txn-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.txn-date { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.txn-amount { font-size: 14px; font-weight: 700; }
+.txn-amount.income  { color: var(--green); }
+.txn-amount.expense { color: var(--red); }
+
+/* ─── GREETING ─────────────────────────────────────────── */
+.greeting-banner {
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent-glow);
+  border-radius: var(--radius);
+  padding: 24px 28px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.greeting-text h2 { font-size: 22px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+.greeting-text p  { font-size: 14px; color: var(--text-secondary); }
+
+.greeting-visual {
+  font-size: 48px;
+  line-height: 1;
+  opacity: 0.8;
+}
+
+/* ─── DONUT RING ───────────────────────────────────────── */
+.ring-chart-wrap { display: flex; align-items: center; gap: 24px; }
+.ring-chart { position: relative; width: 120px; height: 120px; flex-shrink: 0; }
+.ring-chart svg { transform: rotate(-90deg); }
+.ring-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.ring-val  { font-size: 22px; font-weight: 800; color: var(--text); }
+.ring-unit { font-size: 10px; color: var(--text-muted); font-weight: 500; }
+
+.ring-legend { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+.ring-legend-item { display: flex; align-items: center; justify-content: space-between; }
+.ring-legend-left { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); }
+.ring-legend-dot  { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.ring-legend-val  { font-size: 13px; font-weight: 600; color: var(--text); }
+
+/* ─── MISC ─────────────────────────────────────────────── */
+.divider  { height: 1px; background: var(--border); margin: 20px 0; }
+.text-sm  { font-size: 13px; }
+.text-xs  { font-size: 11px; }
+.text-muted { color: var(--text-muted); }
+.text-secondary { color: var(--text-secondary); }
+.font-bold  { font-weight: 700; }
+.font-medium { font-weight: 500; }
+.mb-4 { margin-bottom: 4px; }
+.mb-8 { margin-bottom: 8px; }
+.mb-16 { margin-bottom: 16px; }
+.mb-24 { margin-bottom: 24px; }
+.flex { display: flex; }
+.flex-1 { flex: 1; }
+.items-center { align-items: center; }
+.gap-8 { gap: 8px; }
+.gap-12 { gap: 12px; }
+.gap-16 { gap: 16px; }
+
+/* ─── LOGIN PAGE ────────────────────────────────────────── */
+.login-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-primary);
+  position: relative;
+  overflow: hidden;
+}
+
+.login-bg-orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(80px);
+}
+.login-bg-orb-1 {
+  width: 500px; height: 500px;
+  top: -150px; left: -150px;
+  background: radial-gradient(circle, var(--accent-subtle), transparent 70%);
+}
+.login-bg-orb-2 {
+  width: 400px; height: 400px;
+  bottom: -100px; right: -100px;
+  background: radial-gradient(circle, var(--cyan-subtle), transparent 70%);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 40px;
+  position: relative;
+  z-index: 1;
+  box-shadow: var(--shadow);
+}
+
+.login-logo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 32px;
+}
+
+.login-header { margin-bottom: 28px; }
+.login-header h1 {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.login-header p { font-size: 14px; color: var(--text-secondary); }
+
+.login-form { display: flex; flex-direction: column; gap: 20px; }
+
+.form-group { display: flex; flex-direction: column; gap: 8px; }
+
+.form-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+}
+.input-icon svg { width: 16px; height: 16px; }
+
+.form-input {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 11px 14px 11px 42px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+.form-input::placeholder { color: var(--text-muted); }
+/* Stepper bawaan input number (panah atas/bawah) di Safari/iOS suka nambah lebar
+   intrinsik yang gak kehitung sama width:100%, bikin input bocor tipis ke kanan
+   (~12px) dan sering keliatan kayak halaman "kepotong". Matikan, pakai keyboard
+   numerik native aja (sudah otomatis muncul dari type="number"). */
+input[type="number"] { -webkit-appearance: none; appearance: none; }
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* input[type=date] di Safari/iOS render "bingkai" native sendiri di sekeliling teks
+   tanggalnya, kepisah dari box CSS yang kita styling (.form-input) — kelihatan kayak
+   kotak-dalam-kotak / garis dobel di tepi kanan. Matikan chrome bawaannya; tap buat
+   buka wheel-picker tetap jalan normal, ini cuma soal visual framing-nya aja. */
+input[type="date"] { -webkit-appearance: none; appearance: none; min-width: 0; }
+
+/* .form-input defaultnya punya padding-left 42px buat nampung .input-icon (lihat Profile
+   page) — tapi Dana Pengembangan gak pakai ikon sama sekali, jadi semua field-nya
+   (tanggal/angka/teks/textarea/select) kelihatan teksnya nggak center, geser aneh ke kanan. */
+.dp-page .form-input { padding-left: 14px; }
+.form-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+.input-toggle {
+  position: absolute;
+  right: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  transition: color 0.18s;
+}
+.input-toggle:hover { color: var(--text); }
+.input-toggle svg { width: 16px; height: 16px; }
+
+.login-error {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--red-subtle);
+  border: 1px solid rgba(239,68,68,0.2);
+  color: var(--red);
+  font-size: 13px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+}
+
+.login-btn {
+  width: 100%;
+  justify-content: center;
+  padding: 13px;
+  font-size: 14px;
+  border-radius: var(--radius-sm);
+  margin-top: 4px;
+}
+.login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.login-footer {
+  margin-top: 28px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* spinner */
+.spinner {
+  width: 14px; height: 14px;
+  /* currentColor: ikut warna teks tempatnya (tombol aksen, tombol ghost, teks biasa) */
+  border: 2px solid color-mix(in srgb, currentColor 28%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── TOPBAR USER INFO ──────────────────────────────────── */
+.topbar-user-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.topbar-user-role { font-size: 11px; color: var(--text-muted); }
+
+/* ─── MODAL ─────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: var(--backdrop); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.modal-box {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 16px; padding: 24px; width: 100%; max-width: 440px;
+  box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 16px;
+  /* Anak modal yang gak bisa nyusut (nomor rekening/email panjang tanpa spasi di dalam flex row)
+     bisa meluber horizontal dan bikin isi modal kepotong/geser di mobile -- overflow-x:hidden di
+     sini jadi jaring pengaman global, gak ganggu scroll horizontal internal (mis. .table-wrap yang
+     sengaja overflow-x:auto sendiri buat tabel lebar, itu tetep jalan normal di dalam sini). */
+  overflow-x: hidden;
+}
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.modal-title { font-size: 16px; font-weight: 700; }
+.modal-close {
+  width: 28px; height: 28px; border-radius: 8px; border: none;
+  background: var(--bg-surface); color: var(--text-secondary);
+  cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center;
+}
+.modal-close:hover { background: var(--bg-card-hover); color: var(--text); }
+
+/* ─── DRAWER ─────────────────────────────────────────────── */
+.drawer-overlay {
+  position: fixed; inset: 0; z-index: 300;
+  background: var(--backdrop); backdrop-filter: blur(2px);
+  animation: fadeIn 0.18s ease;
+}
+.drawer-panel {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 301;
+  width: 400px; max-width: 95vw;
+  background: var(--bg-card); border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+  animation: slideInRight 0.22s cubic-bezier(0.16,1,0.3,1);
+}
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+.drawer-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.drawer-body { flex: 1; overflow-y: auto; padding: 20px; }
+.drawer-footer {
+  padding: 14px 20px; border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.drawer-avatar {
+  width: 72px; height: 72px; border-radius: 18px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px; font-weight: 800; color: #fff; margin: 0 auto 14px; flex-shrink: 0;
+}
+.drawer-section { margin-bottom: 20px; }
+.drawer-section-title {
+  font-size: 10px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px;
+}
+.drawer-info-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px;
+}
+.drawer-info-row:last-child { border-bottom: none; }
+.drawer-info-label { color: var(--text-muted); width: 90px; flex-shrink: 0; }
+.drawer-info-value { color: var(--text); font-weight: 500; word-break: break-all; }
+.drawer-role-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700;
+  margin: 3px; width: fit-content;
+}
+
+/* ─── BTN GHOST ─────────────────────────────────────────── */
+.btn-ghost {
+  background: var(--bg-surface); color: var(--text-secondary);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.btn-ghost:hover { background: var(--bg-card-hover); color: var(--text); }
+
+/* ─── HAMBURGER ─────────────────────────────────────────── */
+.hamburger-btn {
+  display: none;
+  width: 36px; height: 36px;
+  border-radius: var(--radius-sm);
+  align-items: center; justify-content: center;
+  color: var(--text-secondary);
+  background: transparent; border: none; cursor: pointer;
+  flex-shrink: 0;
+}
+.hamburger-btn svg { width: 20px; height: 20px; }
+.hamburger-btn:hover { background: var(--hover-overlay); color: var(--text); }
+
+/* ─── SIDEBAR MOBILE OVERLAY ────────────────────────────── */
+.sidebar-mobile-overlay {
+  display: none;
+  position: fixed; inset: 0; z-index: 299;
+  background: var(--backdrop); backdrop-filter: blur(2px);
+}
+
+/* ─── LAYOUT HELPERS ────────────────────────────────────── */
+.two-col-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 20px;
+  height: calc(100vh - 160px);
+}
+.two-col-layout-auto {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 20px;
+  align-items: start;
+}
+
+/* ─── RESPONSIVE ────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .two-col-layout {
+    grid-template-columns: 1fr !important;
+    height: auto !important;
+  }
+  .two-col-layout-auto {
+    grid-template-columns: 1fr !important;
+  }
+  /* Sidebar — hidden off-screen, slides in as overlay */
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    z-index: 300;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.16,1,0.3,1);
+    width: 280px;
+    box-shadow: var(--shadow);
+  }
+  .sidebar--open { transform: translateX(0); }
+  .sidebar-mobile-overlay { display: block; left: 280px; }
+
+  /* Hamburger visible */
+  .hamburger-btn { display: flex; }
+
+  /* Topbar */
+  .topbar { padding: 0 16px; gap: 10px; }
+  .topbar-user-name { display: none; }
+  .topbar-user-role { display: none; }
+
+  /* Page content */
+  .page-content { padding: 16px; }
+
+  /* Stat grid — 2 col */
+  .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+  .stat-value { font-size: 22px; }
+  .stat-card  { padding: 16px; }
+
+  /* Grids → 1 col */
+  .grid-2, .grid-3, .grid-2-1, .grid-1-2 { grid-template-columns: 1fr; gap: 12px; }
+
+  /* Kanban — horizontal scroll */
+  .kanban-board { overflow-x: auto; padding-bottom: 12px; }
+  .kanban-column { min-width: 260px; }
+  .pipeline-board { overflow-x: auto; padding-bottom: 12px; -webkit-overflow-scrolling: touch; }
+  .pipeline-board > * { flex: none; min-width: 240px; }
+
+  /* Member grid */
+  .member-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .member-card { padding: 14px; }
+  .member-avatar { width: 44px; height: 44px; font-size: 15px; }
+
+  /* Balance card */
+  .balance-amount { font-size: 28px; }
+  .balance-metrics { flex-wrap: wrap; gap: 16px; }
+
+  /* Greeting banner */
+  .greeting-banner { padding: 16px 18px; }
+  .greeting-text h2 { font-size: 17px; }
+  .greeting-visual { font-size: 36px; }
+
+  /* Drawer full-width on small screens */
+  .drawer-panel { width: 100%; max-width: 100%; }
+
+  /* Login card padding */
+  .login-card { padding: 28px 20px; }
+
+  /* Tables — horizontal scroll */
+  .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Search + toolbar wrap */
+  .search-bar { margin-bottom: 12px; }
+}
+
+@media (max-width: 480px) {
+  .stat-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .stat-value { font-size: 20px; }
+  .page-content { padding: 12px; }
+  .card { padding: 16px; }
+  .topbar { padding: 0 12px; }
+  .greeting-banner { flex-direction: column; gap: 8px; align-items: flex-start; }
+  .greeting-visual { display: none; }
+  .member-grid { grid-template-columns: repeat(2, 1fr); }
+  .balance-amount { font-size: 24px; }
+
+  /* Touch targets — min 44px height */
+  .btn { min-height: 44px; padding: 10px 16px; }
+  .nav-item { min-height: 44px; }
+  button { min-height: 36px; }
+
+  /* Modal full screen on small mobile */
+  .modal-box { margin: 0; border-radius: 16px 16px 0 0; max-height: 92vh; width: 100%; max-width: 100%; position: fixed; bottom: 0; left: 0; }
+  .modal-overlay { align-items: flex-end; }
+
+  /* Card header wrap on mobile */
+  .card-header { flex-wrap: wrap; gap: 8px; }
+
+  /* Responsive utility grids */
+  .mobile-stack { grid-template-columns: 1fr !important; }
+  .mobile-full  { width: 100% !important; max-width: 100% !important; }
+
+  /* iOS fix: prevent auto-zoom on input focus (font-size harus ≥16px) */
+  input, select, textarea { font-size: 16px !important; }
+}
+
+/* iOS Safari — prevent auto-zoom on any screen size (landscape too) */
+@supports (-webkit-touch-callout: none) {
+  input, select, textarea { font-size: 16px !important; }
+}
+
+/* ─── MODAL INLINE SAFE SIZING ──────────────────────────── */
+/* Pastikan modal inline (non-.modal-box) tidak overflow di mobile */
+[style*="maxWidth"][style*="position: fixed"],
+[style*="max-width"][style*="position: fixed"] {
+  max-width: min(var(--modal-w, 500px), calc(100vw - 24px)) !important;
+}
+
+/* ─── INTERACTIVE UTILITY ───────────────────────────────── */
+.card-action {
+  cursor: pointer;
+  color: var(--accent-light);
+  font-size: 13px;
+  font-weight: 600;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  transition: opacity 0.15s;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+}
+.card-action:hover { opacity: 0.75; }
+
+/* ─── DRAWER RESPONSIVE ─────────────────────────────────── */
+@media (max-width: 600px) {
+  /* Drawer slide dari bawah di layar kecil */
+  .drawer-panel {
+    width: 100% !important;
+    max-width: 100% !important;
+    border-radius: 20px 20px 0 0 !important;
+    top: auto !important;
+    bottom: 0 !important;
+    max-height: 90vh !important;
+  }
+
+  /* Grid 2-col → 1-col di portrait phone */
+  .grid-auto-2 { grid-template-columns: 1fr !important; }
+
+  /* Inline fixed modal → full width di bawah */
+  .modal-bottom-sheet {
+    position: fixed !important;
+    bottom: 0; left: 0; right: 0;
+    border-radius: 20px 20px 0 0;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  /* Tabel — pastikan horizontal scroll aktif */
+  .card > .table-wrap,
+  .card > div > .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Header halaman flex wrap — judul + filter/tombol sering dalam satu baris flex yang
+     lebih lebar dari layar HP kalau tidak di-wrap, bikin seluruh halaman ikut ter-scroll
+     horizontal (bukan cuma baris headernya). */
+  .page-header-row {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .page-header-row > div {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .page-header-row button {
+    width: 100%;
+  }
+}
+
+/* Halaman hub (Keuangan, SDM -- 13 Okt 2026): halaman lama dirender sebagai tab, judul h1-nya
+   disembunyikan karena judul hub sudah ada di Topbar + bar tab. Subjudul & tombol tetap tampil. */
+.hub-tab-isi .page-header h1 { display: none; }
+
+/* ─── SAKLAR MODE GELAP (Sidebar) ──────────────────────── */
+.saklar-tema {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 10px; margin-bottom: 6px; border-radius: var(--radius-sm);
+  font-size: 13px; font-weight: 500; color: var(--text-secondary);
+}
+.saklar-tema:hover { background: var(--hover-overlay); color: var(--text); }
+.saklar-tema-jalur {
+  position: relative; width: 36px; height: 20px; flex-shrink: 0; border-radius: 99px;
+  background: var(--track); border: 1px solid var(--border-hover); transition: background 0.2s;
+}
+.saklar-tema-jalur.nyala { background: var(--accent); border-color: var(--accent); }
+.saklar-tema-bulat {
+  position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--bg-card); box-shadow: var(--shadow-sm); transition: transform 0.2s;
+}
+.saklar-tema-jalur.nyala .saklar-tema-bulat { transform: translateX(16px); }

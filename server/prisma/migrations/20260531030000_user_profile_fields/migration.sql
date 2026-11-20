@@ -1,0 +1,4 @@
+ALTER TABLE "User"
+  ADD COLUMN IF NOT EXISTS "telegramUsername" TEXT,
+  ADD COLUMN IF NOT EXISTS "nomorWa"          TEXT,
+  ADD COLUMN IF NOT EXISTS "tanggalLahir"     TIMESTAMP(3);

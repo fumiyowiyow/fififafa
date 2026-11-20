@@ -1,0 +1,113 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   FILTER ORGANISASI — satu baris pil yang bisa digulir mendatar.
+   Pil = kertas bergaris tinta + titik circle; terpilih = isian tinta,
+   teks kertas, bayang cap, garis stabilo di bawah label, pop saat dipilih.
+   ═══════════════════════════════════════════════════════════════════════ */
+.filter-org { position: relative; min-width: 0; max-width: 100%; }
+.filter-org-baris {
+  position: relative;
+  display: flex; flex-wrap: nowrap; align-items: center; gap: 6px;
+  overflow-x: auto; overscroll-behavior-x: contain;
+  padding: 4px 6px 7px 2px;           /* ruang untuk bayang cap & garis stabilo */
+  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.filter-org-baris::-webkit-scrollbar { display: none; }
+/* Petunjuk gulir: tepi yang masih menyimpan pil memudar. */
+.filter-org.bisa-kanan .filter-org-baris { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent); }
+.filter-org.bisa-kiri .filter-org-baris { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 32px), transparent); }
+.filter-org.bisa-kiri.bisa-kanan .filter-org-baris {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent);
+}
+
+.filter-org-pil {
+  position: relative; flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 30px; padding: 0 11px; border-radius: 99px;
+  font: 600 12px/1 var(--font-display); letter-spacing: 0.01em; white-space: nowrap;
+  color: var(--text); background: var(--bg-card);
+  border: 1.5px solid var(--garis-sedang);
+  cursor: pointer;
+  animation: chip-masuk 0.3s var(--ease-kartun) backwards;
+  animation-delay: calc(var(--i, 0) * 30ms);
+  transition: translate var(--durasi-cepat) var(--ease-kartun), box-shadow var(--durasi-cepat),
+              background var(--durasi-cepat), border-color var(--durasi-cepat), color var(--durasi-cepat);
+}
+.filter-org-pil:hover { border-color: var(--border-hover); background: color-mix(in srgb, var(--sorot) 34%, var(--bg-card)); translate: -1px -1px; box-shadow: var(--bayang-cap-kecil); }
+.filter-org-pil:active { translate: 2px 2px; box-shadow: none; }
+.filter-org-nama { max-width: 9.5rem; overflow: hidden; text-overflow: ellipsis; }
+.filter-org-jumlah {
+  display: inline-grid; place-items: center; min-width: 18px; height: 16px; padding: 0 5px;
+  border-radius: 99px; font: 700 10px/1 var(--font-body); font-variant-numeric: tabular-nums;
+  color: var(--text-secondary); background: hsl(var(--tinta) / 0.07);
+}
+.filter-org-pil .titik-circle { width: 10px; height: 10px; }
+/* Rumah usaha: titik bersudut membulat — sekilas berbeda dari circle. */
+.filter-org-pil .filter-org-titik-rumah { border-radius: 3px; }
+.filter-org-pil .filter-org-titik-tanpa { background: var(--arsir), var(--bg-card); }
+
+/* TERPILIH — isian tinta penuh + garis stabilo di bawah label + pop. */
+.filter-org-pil.aktif {
+  color: var(--teks-di-tinta); background: var(--isian-tinta); border-color: var(--isian-tinta);
+  box-shadow: var(--bayang-cap-kecil); translate: -1px -1px;
+  animation: pilih-pop 0.24s var(--ease-kartun);
+}
+.filter-org-pil.aktif::after {
+  content: ""; position: absolute; left: 14px; right: 12px; bottom: 3px; height: 3px;
+  border-radius: 99px; background: color-mix(in srgb, var(--teks-di-tinta) 45%, transparent); pointer-events: none;
+  transform: skewX(-12deg); transform-origin: left center;
+  animation: stabilo-gores 0.3s var(--ease-halus) 0.06s backwards;
+}
+.filter-org-pil.aktif .filter-org-jumlah { color: var(--teks-di-tinta); background: color-mix(in srgb, var(--teks-di-tinta) 20%, transparent); }
+.filter-org-pil.aktif .titik-circle { border-color: var(--teks-di-tinta); }
+
+@media (max-width: 640px) {
+  .filter-org-pil { height: 28px; padding: 0 10px; font-size: 11.5px; }
+  .filter-org-nama { max-width: 7rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .filter-org-pil, .filter-org-pil.aktif, .filter-org-pil.aktif::after { animation: none; }
+  .filter-org-pil:hover, .filter-org-pil:active, .filter-org-pil.aktif { translate: none; }
+}
+@media print {
+  .filter-org-baris { -webkit-mask-image: none; mask-image: none; flex-wrap: wrap; }
+}
+
+/* ── SARING GANDA (SaringGanda.jsx) — pil + tombol "+ Circle" ─────────────
+   [Semua][Studio][Project] | CIRCLE [● Rumah PARA ×] [+ Circle]. Baris BOLEH
+   melipat (bukan gulir) supaya "+ Circle" selalu terlihat. */
+.saring-baris { flex-wrap: wrap; overflow: visible; row-gap: 8px; }
+.saring-sekat { flex-shrink: 0; width: 1.5px; height: 18px; margin: 0 4px; background: var(--garis-sedang); border-radius: 2px; }
+.saring-label { flex-shrink: 0; font: 800 9.5px/1 var(--font-body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); }
+.saring-semua-circle { font: 700 12px/1 var(--font-display); color: var(--text-muted); }
+.saring-pil-circle { cursor: default; padding-right: 5px; }
+.saring-pil-x {
+  display: inline-grid; place-items: center; width: 20px; height: 20px; margin-left: 2px; border-radius: 50%;
+  font: 800 13px/1 var(--font-body); cursor: pointer; background: none; border: none;
+  color: var(--teks-di-tinta); opacity: 0.75;
+}
+.saring-pil-x:hover { opacity: 1; background: color-mix(in srgb, var(--teks-di-tinta) 22%, transparent); }
+/* "+ Circle": select transparan di atas pil putus-putus. */
+.saring-tambah {
+  position: relative; flex-shrink: 0; display: inline-flex; align-items: center; height: 30px; padding: 0 12px;
+  border-radius: 99px; border: 1.5px dashed var(--border-hover); cursor: pointer;
+  font: 700 12px/1 var(--font-display); color: var(--text); background: var(--bg-card);
+  transition: background var(--durasi-cepat), color var(--durasi-cepat);
+}
+.saring-tambah:hover { background: var(--isian-tinta); color: var(--teks-di-tinta); border-style: solid; }
+.saring-tambah select { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+@media (max-width: 640px) { .saring-tambah { height: 28px; padding: 0 10px; font-size: 11.5px; } }
+
+/* ── SARING STATUS (SaringStatus.jsx) — Sudah/Belum + tombol pengingat ── */
+.saring-status { margin-top: 8px; }
+.filter-org-pil.saring-pil-belum:not(.aktif) { border-color: var(--kritis); color: var(--kritis); }
+.filter-org-pil.saring-pil-belum:not(.aktif) .filter-org-jumlah { color: var(--kritis); background: var(--kritis-lapis); }
+.saring-ingatkan {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 13px;
+  border-radius: 99px; cursor: pointer; font: 700 12px/1 var(--font-display);
+  color: var(--teks-di-tinta); background: var(--kritis); border: 1.5px solid var(--border-hover);
+  box-shadow: var(--bayang-cap-kecil); transition: translate 150ms var(--ease-kartun), box-shadow 150ms;
+}
+.saring-ingatkan:hover:not(:disabled) { translate: -1px -1px; box-shadow: var(--bayang-cap-lirih); }
+.saring-ingatkan:disabled { opacity: 0.7; cursor: default; }
+@media (max-width: 640px) { .saring-ingatkan { height: 28px; font-size: 11.5px; padding: 0 10px; } }

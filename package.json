@@ -1,0 +1,27 @@
+{
+  "name": "management-dashboard",
+  "version": "1.0.0",
+  "description": "Management Dashboard — monorepo root",
+  "private": true,
+  "scripts": {
+    "dev:client": "cd client && npm run dev",
+    "dev:server": "cd server && npm run dev",
+    "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
+    "build": "cd client && npm run build",
+    "start": "NODE_ENV=production node server/src/app.js",
+    "install:all": "npm install --prefix client && npm install --prefix server",
+    "db:migrate": "cd server && npx prisma migrate deploy",
+    "db:seed": "cd server && node prisma/seed.js",
+    "db:generate": "cd server && npx prisma generate"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mellakamal/management-dashboard.git"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

@@ -1,0 +1,6 @@
+ALTER TABLE "ProgramPeserta"
+  ADD COLUMN IF NOT EXISTS "namaLengkap"  TEXT,
+  ADD COLUMN IF NOT EXISTS "nisn"         TEXT,
+  ADD COLUMN IF NOT EXISTS "sekolahAsal"  TEXT,
+  ADD COLUMN IF NOT EXISTS "kelas"        TEXT,
+  ADD COLUMN IF NOT EXISTS "tanggalLahir" TIMESTAMP(3);

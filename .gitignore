@@ -1,0 +1,35 @@
+node_modules/
+dist/
+.env
+*.local
+
+# Prisma
+server/prisma/migrations/*.sql.bak
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Screenshots (verifikasi saja)
+verify_*.png
+
+# Claude Code local config
+.claude/
+
+# Railway / deployment config (tidak dipakai)
+railway.toml
+nixpacks.toml
+
+# File HTML lepas (presentasi, panduan, laporan)
+*.html
+!client/index.html
+
+# Folder src kosong di root
+/src/
+
+# File upload user (kanban hasil karya, SKB studio) — disimpan lokal di VPS, jangan ikut commit
+server/uploads/
